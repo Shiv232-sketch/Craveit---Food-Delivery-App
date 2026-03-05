@@ -26,20 +26,16 @@ export default function Navbar({ navigate, activePage }) {
           <span className="logo-icon">🔥</span>
           <span className="logo-text">CraveIt</span>
         </div>
-
         <ul className={`nav-links ${menuOpen ? 'open' : ''}`}>
           {links.map(l => (
             <li key={l.key}>
-              <button
-                className={`nav-link ${activePage === l.key ? 'active' : ''}`}
-                onClick={() => { navigate(l.key); setMenuOpen(false); }}
-              >
+              <button className={`nav-link ${activePage === l.key ? 'active' : ''}`}
+                onClick={() => { navigate(l.key); setMenuOpen(false); }}>
                 {l.label}
               </button>
             </li>
           ))}
         </ul>
-
         <div className="nav-actions">
           <button className="cart-btn" onClick={() => setIsCartOpen(true)}>
             🛒 Cart {totalItems > 0 && <span className="cart-badge">{totalItems}</span>}

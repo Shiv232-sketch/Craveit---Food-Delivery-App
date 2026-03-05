@@ -1,22 +1,17 @@
 import React from 'react';
-
 export default function Footer({ navigate }) {
   return (
     <footer className="footer">
       <div className="footer-inner">
         <div className="footer-brand">
-          <div className="logo">
-            <span className="logo-icon">🔥</span>
-            <span className="logo-text">CraveIt</span>
-          </div>
+          <div className="logo"><span className="logo-icon">🔥</span><span className="logo-text">CraveIt</span></div>
           <p>Your Cravings, Delivered Fast.</p>
         </div>
         <div className="footer-links">
           <h4>Quick Links</h4>
-          <button onClick={() => navigate('home')}>Home</button>
-          <button onClick={() => navigate('menu')}>Menu</button>
-          <button onClick={() => navigate('tracking')}>Track Order</button>
-          <button onClick={() => navigate('about')}>About</button>
+          {[['Home','home'],['Menu','menu'],['Track Order','tracking'],['About','about']].map(([l,k]) => (
+            <button key={k} onClick={() => navigate(k)}>{l}</button>
+          ))}
         </div>
         <div className="footer-contact">
           <h4>Contact</h4>
