@@ -55,7 +55,7 @@ export default function About() {
             
           </p>
           <div className="tech-tags">
-            {['React.js', 'Context API', 'CSS3', 'Node.js (Planned)', 'MongoDB (Planned)', 'Express.js (Planned)'].map(t => (
+            {['React.js', 'CSS3', 'Node.js ', 'MongoDB ', 'Express.js '].map(t => (
               <span key={t} className="tech-tag">{t}</span>
             ))}
           </div>
