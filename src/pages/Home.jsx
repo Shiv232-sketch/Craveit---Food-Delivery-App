@@ -64,7 +64,8 @@ export default function Home({ navigate }) {
             {[
               { step: '01', icon: '🍽️', title: 'Browse Menu', desc: 'Explore our wide variety of fresh, delicious dishes.' },
               { step: '02', icon: '🛒', title: 'Add to Cart', desc: 'Select your favourite items and add them to your cart.' },
-              { step: '03', icon: '🚀', title: 'Get Delivered', desc: 'Place your order and get it delivered hot to your door.' },
+              { step: '03', icon: '🚀', title: 'Place Order', desc: 'Place your order and get it delivered hot to your door.' },
+              
             ].map(s => (
               <div key={s.step} className="step-card">
                 <div className="step-num">{s.step}</div>

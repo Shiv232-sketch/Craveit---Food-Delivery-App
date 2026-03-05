@@ -50,10 +50,9 @@ export default function About() {
         <div className="about-project">
           <h3>🎓 About This Project</h3>
           <p>
-            This website was developed as a <strong>BCA Final Year Project</strong> at{' '}
-            <strong>Integral University</strong>. It demonstrates full-stack web development
-            concepts including React.js, component-based architecture, state management with
-            Context API, and responsive CSS design.
+            This website was developed as a <strong>BCA Final Year Student</strong> at{' '}
+            <strong>Integral University</strong>. 
+            
           </p>
           <div className="tech-tags">
             {['React.js', 'Context API', 'CSS3', 'Node.js (Planned)', 'MongoDB (Planned)', 'Express.js (Planned)'].map(t => (

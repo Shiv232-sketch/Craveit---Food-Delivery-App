@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useCart } from '../context/CartContext';
 import PaymentModal from './PaymentModal';
 
-export default function Cart({ navigateToTracking }) {
+export default function Cart({ onOrderSuccess }) {
   const { cartItems, removeFromCart, updateQty, totalPrice, isCartOpen, setIsCartOpen, clearCart } = useCart();
   const [step, setStep] = useState('cart'); // cart | address | payment
   const [address, setAddress] = useState({
@@ -29,16 +29,25 @@ export default function Cart({ navigateToTracking }) {
 
   const handleProceedToPayment = () => { if (validateAddress()) setStep('payment'); };
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = (orderId) => {
+    // Build order data to pass to tracking page
+    const orderData = {
+      orderId,
+      items: [...cartItems],
+      grandTotal,
+      address: `${address.flat}, ${address.area}, ${address.city}, ${address.state} - ${address.pincode}`,
+      addressType: address.type,
+      recipientName: address.name,
+      recipientPhone: address.phone,
+    };
+    clearCart();
     setStep('cart');
     setIsCartOpen(false);
     setAddress({ name:'', phone:'', flat:'', area:'', city:'', state:'', pincode:'', type:'Home' });
-    clearCart();
-    navigateToTracking();
+    onOrderSuccess(orderData);
   };
 
   const handleClose = () => { setStep('cart'); setIsCartOpen(false); };
-
   const fullAddress = `${address.flat}, ${address.area}, ${address.city}, ${address.state} - ${address.pincode}`;
 
   if (!isCartOpen) return null;
@@ -132,91 +141,59 @@ export default function Cart({ navigateToTracking }) {
               </div>
               <button className="cart-close" onClick={handleClose}>✕</button>
             </div>
-
             <div className="address-form-wrap">
-              {/* Address Type */}
               <div className="addr-type-row">
                 {[['Home','🏠'],['Work','🏢'],['Other','📌']].map(([t,icon]) => (
-                  <button key={t}
-                    className={`addr-type-btn ${address.type === t ? 'active' : ''}`}
-                    onClick={() => setAddress({...address, type: t})}
-                  >
-                    {icon} {t}
-                  </button>
+                  <button key={t} className={`addr-type-btn ${address.type === t ? 'active' : ''}`}
+                    onClick={() => setAddress({...address, type: t})}>{icon} {t}</button>
                 ))}
               </div>
-
-              {/* Name & Phone */}
               <div className="addr-row-grid">
                 <div className="addr-group">
                   <label>Full Name *</label>
-                  <input type="text" placeholder="Your full name"
-                    value={address.name}
-                    onChange={e => setAddress({...address, name: e.target.value})}
-                  />
+                  <input type="text" placeholder="Your full name" value={address.name}
+                    onChange={e => setAddress({...address, name: e.target.value})} />
                   {errors.name && <span className="addr-err">{errors.name}</span>}
                 </div>
                 <div className="addr-group">
                   <label>Phone Number *</label>
-                  <input type="tel" placeholder="10-digit mobile"
-                    value={address.phone}
-                    onChange={e => setAddress({...address, phone: e.target.value.replace(/\D/g,'').slice(0,10)})}
-                  />
+                  <input type="tel" placeholder="10-digit mobile" value={address.phone}
+                    onChange={e => setAddress({...address, phone: e.target.value.replace(/\D/g,'').slice(0,10)})} />
                   {errors.phone && <span className="addr-err">{errors.phone}</span>}
                 </div>
               </div>
-
-              {/* Flat */}
               <div className="addr-group">
                 <label>Flat / House No. / Building *</label>
-                <input type="text" placeholder="e.g. Flat 4B, Green Apartments"
-                  value={address.flat}
-                  onChange={e => setAddress({...address, flat: e.target.value})}
-                />
+                <input type="text" placeholder="e.g. Flat 4B, Green Apartments" value={address.flat}
+                  onChange={e => setAddress({...address, flat: e.target.value})} />
                 {errors.flat && <span className="addr-err">{errors.flat}</span>}
               </div>
-
-              {/* Area */}
               <div className="addr-group">
                 <label>Area / Street / Locality *</label>
-                <input type="text" placeholder="e.g. MG Road, Near City Mall"
-                  value={address.area}
-                  onChange={e => setAddress({...address, area: e.target.value})}
-                />
+                <input type="text" placeholder="e.g. MG Road, Near City Mall" value={address.area}
+                  onChange={e => setAddress({...address, area: e.target.value})} />
                 {errors.area && <span className="addr-err">{errors.area}</span>}
               </div>
-
-              {/* City & State */}
               <div className="addr-row-grid">
                 <div className="addr-group">
                   <label>City *</label>
-                  <input type="text" placeholder="e.g. Lucknow"
-                    value={address.city}
-                    onChange={e => setAddress({...address, city: e.target.value})}
-                  />
+                  <input type="text" placeholder="e.g. Lucknow" value={address.city}
+                    onChange={e => setAddress({...address, city: e.target.value})} />
                   {errors.city && <span className="addr-err">{errors.city}</span>}
                 </div>
                 <div className="addr-group">
                   <label>State *</label>
-                  <input type="text" placeholder="e.g. Uttar Pradesh"
-                    value={address.state}
-                    onChange={e => setAddress({...address, state: e.target.value})}
-                  />
+                  <input type="text" placeholder="e.g. Uttar Pradesh" value={address.state}
+                    onChange={e => setAddress({...address, state: e.target.value})} />
                   {errors.state && <span className="addr-err">{errors.state}</span>}
                 </div>
               </div>
-
-              {/* Pincode */}
               <div className="addr-group">
                 <label>Pincode *</label>
-                <input type="text" placeholder="6-digit pincode"
-                  value={address.pincode}
-                  onChange={e => setAddress({...address, pincode: e.target.value.replace(/\D/g,'').slice(0,6)})}
-                />
+                <input type="text" placeholder="6-digit pincode" value={address.pincode}
+                  onChange={e => setAddress({...address, pincode: e.target.value.replace(/\D/g,'').slice(0,6)})} />
                 {errors.pincode && <span className="addr-err">{errors.pincode}</span>}
               </div>
-
-              {/* Live Preview */}
               {address.flat && address.city && (
                 <div className="addr-preview">
                   <span className="addr-preview-icon">
@@ -230,7 +207,6 @@ export default function Cart({ navigateToTracking }) {
                 </div>
               )}
             </div>
-
             <div className="cart-footer">
               <button className="checkout-btn" onClick={handleProceedToPayment}>
                 💳 Proceed to Payment
