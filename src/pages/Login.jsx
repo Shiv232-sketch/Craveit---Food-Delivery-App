@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-export default function Login({ navigate }) {
+export default function Login() {
+  const navigate = useNavigate();
   const { login } = useAuth();
   const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
@@ -27,7 +29,7 @@ export default function Login({ navigate }) {
     const result = await login(form.email, form.password);
     setLoading(false);
     if (result.success) {
-      navigate('home');
+      navigate('/');
     } else {
       setApiError(result.message || 'Login failed. Please try again.');
     }
@@ -44,7 +46,7 @@ export default function Login({ navigate }) {
       {/* Left Panel — Branding */}
       <div className="auth-left">
         <div className="auth-left-content">
-          <div className="auth-brand" onClick={() => navigate('home')}>
+          <div className="auth-brand" onClick={() => navigate('/')}>
             <span className="auth-brand-icon">🔥</span>
             <span className="auth-brand-name">CraveIt</span>
           </div>
@@ -131,7 +133,7 @@ export default function Login({ navigate }) {
 
           <p className="auth-switch">
             Don't have an account?{' '}
-            <button onClick={() => navigate('signup')}>Create one →</button>
+            <button onClick={() => navigate('/signup')}>Create one →</button>
           </p>
         </div>
       </div>

@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 
-export default function Navbar({ navigate, activePage }) {
+export default function Navbar() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const { totalItems, setIsCartOpen } = useCart();
   const { user, isLoggedIn, logout } = useAuth();
   const [scrolled, setScrolled] = useState(false);
@@ -10,13 +13,14 @@ export default function Navbar({ navigate, activePage }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
 
+  const activePage = location.pathname;
+
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', onScroll);
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Close user menu on outside click
   useEffect(() => {
     const handler = (e) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
@@ -28,39 +32,38 @@ export default function Navbar({ navigate, activePage }) {
   }, []);
 
   const links = [
-    { label: 'Home', key: 'home' },
-    { label: 'Menu', key: 'menu' },
-    { label: 'Track Order', key: 'tracking' },
-    { label: 'About', key: 'about' },
+    { label: 'Home',        path: '/' },
+    { label: 'Menu',        path: '/menu' },
+    { label: 'Track Order', path: '/tracking' },
+    { label: 'About',       path: '/about' },
   ];
 
   const handleLogout = () => {
     logout();
     setUserMenuOpen(false);
-    navigate('home');
+    navigate('/');
   };
 
-  // Get initials for avatar
   const initials = user?.name
     ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : '?';
 
+  const go = (path) => { navigate(path); setMenuOpen(false); };
+
   return (
     <nav className={`navbar ${scrolled ? 'scrolled' : ''}`}>
       <div className="nav-inner">
-        {/* Logo */}
-        <div className="logo" onClick={() => navigate('home')}>
+        <div className="logo" onClick={() => go('/')}>
           <span className="logo-icon">🔥</span>
           <span className="logo-text">CraveIt</span>
         </div>
 
-        {/* Links */}
         <ul className={`nav-links ${menuOpen ? 'open' : ''}`}>
           {links.map(l => (
-            <li key={l.key}>
+            <li key={l.path}>
               <button
-                className={`nav-link ${activePage === l.key ? 'active' : ''}`}
-                onClick={() => { navigate(l.key); setMenuOpen(false); }}
+                className={`nav-link ${activePage === l.path ? 'active' : ''}`}
+                onClick={() => go(l.path)}
               >
                 {l.label}
               </button>
@@ -68,14 +71,11 @@ export default function Navbar({ navigate, activePage }) {
           ))}
         </ul>
 
-        {/* Actions */}
         <div className="nav-actions">
-          {/* Cart */}
           <button className="cart-btn" onClick={() => setIsCartOpen(true)}>
             🛒 Cart {totalItems > 0 && <span className="cart-badge">{totalItems}</span>}
           </button>
 
-          {/* User area */}
           {isLoggedIn ? (
             <div className="user-menu-wrap" ref={userMenuRef}>
               <button className="user-avatar-btn" onClick={() => setUserMenuOpen(o => !o)}>
@@ -93,26 +93,18 @@ export default function Navbar({ navigate, activePage }) {
                     </div>
                   </div>
                   <div className="user-dropdown-divider" />
-                  <button className="user-dropdown-item" onClick={() => { navigate('tracking'); setUserMenuOpen(false); }}>
-                    📦 My Orders
-                  </button>
-                  <button className="user-dropdown-item" onClick={() => { navigate('menu'); setUserMenuOpen(false); }}>
-                    🍔 Browse Menu
-                  </button>
-                  <button className="user-dropdown-item" onClick={() => { navigate('admin'); setUserMenuOpen(false); }}>
-                    ⚙️ Admin Panel
-                  </button>
+                  <button className="user-dropdown-item" onClick={() => { go('/tracking'); setUserMenuOpen(false); }}>📦 My Orders</button>
+                  <button className="user-dropdown-item" onClick={() => { go('/menu'); setUserMenuOpen(false); }}>🍔 Browse Menu</button>
+                  <button className="user-dropdown-item" onClick={() => { window.open('/admin', '_blank'); setUserMenuOpen(false); }}>⚙️ Admin Panel</button>
                   <div className="user-dropdown-divider" />
-                  <button className="user-dropdown-item logout" onClick={handleLogout}>
-                    🚪 Sign Out
-                  </button>
+                  <button className="user-dropdown-item logout" onClick={handleLogout}>🚪 Sign Out</button>
                 </div>
               )}
             </div>
           ) : (
             <div className="auth-nav-btns">
-              <button className="nav-login-btn" onClick={() => navigate('login')}>Sign In</button>
-              <button className="nav-signup-btn" onClick={() => navigate('signup')}>Sign Up</button>
+              <button className="nav-login-btn"  onClick={() => go('/login')}>Sign In</button>
+              <button className="nav-signup-btn" onClick={() => go('/signup')}>Sign Up</button>
             </div>
           )}
 

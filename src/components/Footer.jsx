@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const HIW_STEPS = [
   {
@@ -76,7 +77,8 @@ function HowItWorksCards() {
   );
 }
 
-export default function Footer({ navigate }) {
+export default function Footer() {
+  const navigate = useNavigate();
 
   return (
     <footer className="footer">
@@ -114,7 +116,7 @@ export default function Footer({ navigate }) {
           {/* Quick Links */}
           <div className="footer-col">
             <h4>Quick Links</h4>
-            {[['🏠 Home','home'],['🍔 Menu','menu'],['📦 Track Order','tracking'],['ℹ️ About','about']].map(([l,k]) => (
+            {[['🏠 Home','/'],['🍔 Menu','/menu'],['📦 Track Order','/tracking'],['ℹ️ About','/about']].map(([l,k]) => (
               <button key={k} onClick={() => navigate(k)}>{l}</button>
             ))}
           </div>

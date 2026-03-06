@@ -1,6 +1,8 @@
 // HeroSection.jsx
 import React from 'react';
-export default function HeroSection({ navigate }) {
+import { useNavigate } from 'react-router-dom';
+export default function HeroSection() {
+  const navigate = useNavigate();
   return (
     <section className="hero">
       <div className="hero-bg">
@@ -11,8 +13,8 @@ export default function HeroSection({ navigate }) {
         <h1 className="hero-title">Your Cravings,<br /><span className="hero-accent">Delivered Fast</span></h1>
         <p className="hero-subtitle">Fresh, hot, and delicious food delivered straight to your door. Order in seconds, enjoy in minutes.</p>
         <div className="hero-actions">
-          <button className="btn-primary" onClick={() => navigate('menu')}>🍔 Order Now</button>
-          <button className="btn-secondary" onClick={() => navigate('tracking')}>📦 Track Order</button>
+          <button className="btn-primary" onClick={() => navigate('/menu')}>🍔 Order Now</button>
+          <button className="btn-secondary" onClick={() => navigate('/tracking')}>📦 Track Order</button>
         </div>
         <div className="hero-stats">
           <div className="stat"><span className="stat-num">50+</span><span className="stat-label">Menu Items</span></div>

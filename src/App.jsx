@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { CartProvider } from './context/CartContext';
 import { AuthProvider } from './context/AuthContext';
 import { OrderProvider } from './context/OrderContext';
+
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Cart from './components/Cart';
+
 import Home from './pages/Home';
 import Menu from './pages/Menu';
 import OrderTracking from './pages/OrderTracking';
@@ -14,56 +17,59 @@ import Signup from './pages/Signup';
 import AdminLogin from './pages/AdminLogin';
 import AdminPanel from './pages/AdminPanel';
 
-export default function App() {
-  const [page, setPage] = useState('home');
-  const [activeOrderId, setActiveOrderId] = useState(null);
+// ── Admin area — has its own layout (no Navbar/Footer) ──
+function AdminArea() {
   const [isAdmin, setIsAdmin] = useState(!!localStorage.getItem('craveit_admin'));
 
-  const navigate = (p) => {
-    setPage(p);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleOrderSuccess = (orderId) => {
-    setActiveOrderId(orderId);
-    navigate('tracking');
-  };
-
-  const handleAdminLogout = () => {
+  const handleLogout = () => {
     localStorage.removeItem('craveit_admin');
     setIsAdmin(false);
-    setPage('home');
   };
 
-  if (page === 'admin') {
-    if (!isAdmin) return <OrderProvider><AdminLogin onLogin={() => setIsAdmin(true)} /></OrderProvider>;
-    return <OrderProvider><AdminPanel onLogout={handleAdminLogout} /></OrderProvider>;
-  }
+  return (
+    <OrderProvider>
+      {isAdmin
+        ? <AdminPanel onLogout={handleLogout} />
+        : <AdminLogin onLogin={() => setIsAdmin(true)} />}
+    </OrderProvider>
+  );
+}
 
-  if (page === 'login')  return <AuthProvider><Login  navigate={navigate} /></AuthProvider>;
-  if (page === 'signup') return <AuthProvider><Signup navigate={navigate} /></AuthProvider>;
-
-  const renderPage = () => {
-    switch (page) {
-      case 'menu':     return <Menu />;
-      case 'tracking': return <OrderTracking activeOrderId={activeOrderId} />;
-      case 'about':    return <About />;
-      default:         return <Home navigate={navigate} />;
-    }
-  };
+// ── Main site — shared Navbar + Footer ──
+function MainSite() {
+  const [activeOrderId, setActiveOrderId] = useState(null);
 
   return (
     <OrderProvider>
       <AuthProvider>
         <CartProvider>
           <div className="app">
-            <Navbar navigate={navigate} activePage={page} />
-            <Cart onOrderSuccess={handleOrderSuccess} />
-            <main>{renderPage()}</main>
-            <Footer navigate={navigate} />
+            <Navbar />
+            <Cart onOrderSuccess={(id) => setActiveOrderId(id)} />
+            <main>
+              <Routes>
+                <Route path="/"         element={<Home />} />
+                <Route path="/menu"     element={<Menu />} />
+                <Route path="/tracking" element={<OrderTracking activeOrderId={activeOrderId} />} />
+                <Route path="/about"    element={<About />} />
+                <Route path="/login"    element={<Login />} />
+                <Route path="/signup"   element={<Signup />} />
+                <Route path="*"         element={<Navigate to="/" replace />} />
+              </Routes>
+            </main>
+            <Footer />
           </div>
         </CartProvider>
       </AuthProvider>
     </OrderProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/admin" element={<AdminArea />} />
+      <Route path="/*"     element={<MainSite />} />
+    </Routes>
   );
 }

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-export default function Signup({ navigate }) {
+export default function Signup() {
+  const navigate = useNavigate();
   const { register } = useAuth();
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', confirm: '' });
   const [errors, setErrors] = useState({});
@@ -32,7 +34,7 @@ export default function Signup({ navigate }) {
     const result = await register(form.name, form.email, form.password, form.phone);
     setLoading(false);
     if (result.success) {
-      navigate('home');
+      navigate('/');
     } else {
       setApiError(result.message || 'Registration failed. Please try again.');
     }
@@ -64,7 +66,7 @@ export default function Signup({ navigate }) {
       {/* Left Panel */}
       <div className="auth-left signup-left">
         <div className="auth-left-content">
-          <div className="auth-brand" onClick={() => navigate('home')}>
+          <div className="auth-brand" onClick={() => navigate('/')}>
             <span className="auth-brand-icon">🔥</span>
             <span className="auth-brand-name">CraveIt</span>
           </div>
@@ -191,7 +193,7 @@ export default function Signup({ navigate }) {
 
           <p className="auth-switch">
             Already have an account?{' '}
-            <button onClick={() => navigate('login')}>Sign in →</button>
+            <button onClick={() => navigate('/login')}>Sign in →</button>
           </p>
         </div>
       </div>
