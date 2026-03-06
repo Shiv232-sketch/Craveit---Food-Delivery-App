@@ -11,6 +11,7 @@ import Cart from './components/Cart';
 import Home from './pages/Home';
 import Menu from './pages/Menu';
 import OrderTracking from './pages/OrderTracking';
+import OrderHistory from './pages/OrderHistory';
 import About from './pages/About';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
@@ -51,6 +52,7 @@ function MainSite() {
                 <Route path="/"         element={<Home />} />
                 <Route path="/menu"     element={<Menu />} />
                 <Route path="/tracking" element={<OrderTracking activeOrderId={activeOrderId} />} />
+                <Route path="/orders"   element={<OrderHistory />} />
                 <Route path="/about"    element={<About />} />
                 <Route path="/login"    element={<Login />} />
                 <Route path="/signup"   element={<Signup />} />

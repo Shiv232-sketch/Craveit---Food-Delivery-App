@@ -93,9 +93,8 @@ export default function Navbar() {
                     </div>
                   </div>
                   <div className="user-dropdown-divider" />
-                  <button className="user-dropdown-item" onClick={() => { go('/tracking'); setUserMenuOpen(false); }}>📦 My Orders</button>
+                  <button className="user-dropdown-item" onClick={() => { go('/orders'); setUserMenuOpen(false); }}>📦 My Orders</button>
                   <button className="user-dropdown-item" onClick={() => { go('/menu'); setUserMenuOpen(false); }}>🍔 Browse Menu</button>
-                  <button className="user-dropdown-item" onClick={() => { window.open('/admin', '_blank'); setUserMenuOpen(false); }}>⚙️ Admin Panel</button>
                   <div className="user-dropdown-divider" />
                   <button className="user-dropdown-item logout" onClick={handleLogout}>🚪 Sign Out</button>
                 </div>
