@@ -289,7 +289,7 @@ function Orders() {
 // ── Users ──
 function Users() {
   const { orders } = useOrders();
-  // Combine fake users with real order customers
+
   const realCustomers = [...new Map(orders.map(o => [o.customer, {
     id: o.id, name: o.customer, phone: o.phone||'—',
     email: `${o.customer?.split(' ')[0]?.toLowerCase()}@gmail.com`,
@@ -299,17 +299,60 @@ function Users() {
     isReal: true,
   }])).values()];
 
-  const allUsers = [...realCustomers, ...FAKE_USERS.filter(u => !realCustomers.find(r=>r.name===u.name))];
+  const [users, setUsers] = useState(() => [
+    ...realCustomers,
+    ...FAKE_USERS.filter(u => !realCustomers.find(r => r.name === u.name))
+  ]);
+  const [editUser, setEditUser]   = useState(null);   // user being edited
+  const [showEdit, setShowEdit]   = useState(false);
+  const [form, setForm]           = useState({});
+  const [search, setSearch]       = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // id to confirm delete
+
+  const filtered = users.filter(u =>
+    u.name?.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const openEdit = (u) => {
+    setForm({ name: u.name, email: u.email, phone: u.phone });
+    setEditUser(u);
+    setShowEdit(true);
+  };
+
+  const handleSave = () => {
+    if (!form.name || !form.email) return;
+    setUsers(prev => prev.map(u =>
+      u === editUser ? { ...u, ...form } : u
+    ));
+    setShowEdit(false);
+  };
+
+  const handleDelete = (u) => {
+    setUsers(prev => prev.filter(x => x !== u));
+    setDeleteConfirm(null);
+  };
 
   return (
     <div className="ap-section">
-      <div className="ap-section-head"><h2>User Management</h2><span className="ap-badge">{allUsers.length} users</span></div>
+      <div className="ap-section-head">
+        <h2>User Management</h2>
+        <div style={{display:'flex',gap:'0.75rem',alignItems:'center'}}>
+          <input className="ap-search" placeholder="🔍 Search users..." value={search} onChange={e=>setSearch(e.target.value)} />
+          <span className="ap-badge">{users.length} users</span>
+        </div>
+      </div>
+
       <div className="ap-card">
         <div className="ap-table-wrap">
           <table className="ap-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Orders</th><th>Total Spent</th><th>Joined</th></tr></thead>
+            <thead>
+              <tr><th>Name</th><th>Email</th><th>Phone</th><th>Orders</th><th>Total Spent</th><th>Joined</th><th>Actions</th></tr>
+            </thead>
             <tbody>
-              {allUsers.map((u,i) => (
+              {filtered.length === 0 ? (
+                <tr><td colSpan={7} className="ap-empty">No users found.</td></tr>
+              ) : filtered.map((u, i) => (
                 <tr key={i}>
                   <td>
                     <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
@@ -325,12 +368,81 @@ function Users() {
                   <td><span className="ap-badge">{u.orders} orders</span></td>
                   <td><strong style={{color:'#22c55e'}}>₹{u.spent?.toLocaleString()}</strong></td>
                   <td className="ap-muted">{u.joined}</td>
+                  <td>
+                    <div style={{display:'flex',gap:'0.4rem'}}>
+                      <button className="ap-icon-btn edit" onClick={() => openEdit(u)} title="Edit user">✏️</button>
+                      <button className="ap-icon-btn delete" onClick={() => setDeleteConfirm(u)} title="Delete user">🗑️</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      {showEdit && (
+        <div className="ap-modal-overlay" onClick={() => setShowEdit(false)}>
+          <div className="ap-modal" onClick={e => e.stopPropagation()}>
+            <div className="ap-modal-head">
+              <h3>Edit User</h3>
+              <button onClick={() => setShowEdit(false)}>✕</button>
+            </div>
+            <div className="ap-modal-body">
+              {/* Avatar preview */}
+              <div style={{display:'flex',alignItems:'center',gap:'1rem',marginBottom:'0.5rem'}}>
+                <div className="ap-user-avatar" style={{width:48,height:48,fontSize:'1rem',background: editUser?.isReal ? '#22c55e' : 'var(--primary)'}}>
+                  {form.name?.split(' ').map(n=>n[0]).join('').slice(0,2)}
+                </div>
+                <div>
+                  <p style={{fontWeight:700,color:'var(--dark)'}}>{form.name || 'User Name'}</p>
+                  {editUser?.isReal && <span style={{fontSize:'0.75rem',color:'#22c55e'}}>● Real customer</span>}
+                </div>
+              </div>
+              <div className="ap-field">
+                <label>Full Name *</label>
+                <input placeholder="Full name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+              </div>
+              <div className="ap-field">
+                <label>Email *</label>
+                <input type="email" placeholder="email@example.com" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+              </div>
+              <div className="ap-field">
+                <label>Phone</label>
+                <input type="tel" placeholder="10-digit number" value={form.phone} onChange={e => setForm({...form, phone: e.target.value.replace(/\D/g,'').slice(0,10)})} />
+              </div>
+            </div>
+            <div className="ap-modal-foot">
+              <button className="ap-btn-secondary" onClick={() => setShowEdit(false)}>Cancel</button>
+              <button className="ap-btn-primary" onClick={handleSave}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm Modal */}
+      {deleteConfirm && (
+        <div className="ap-modal-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="ap-modal" style={{maxWidth:380}} onClick={e => e.stopPropagation()}>
+            <div className="ap-modal-head">
+              <h3>Delete User</h3>
+              <button onClick={() => setDeleteConfirm(null)}>✕</button>
+            </div>
+            <div className="ap-modal-body">
+              <div style={{textAlign:'center',padding:'0.5rem 0'}}>
+                <div style={{fontSize:'2.5rem',marginBottom:'0.75rem'}}>🗑️</div>
+                <p style={{fontWeight:700,color:'var(--dark)',marginBottom:'0.4rem'}}>Delete <span style={{color:'#dc2626'}}>{deleteConfirm.name}</span>?</p>
+                <p style={{fontSize:'0.85rem',color:'var(--gray)'}}>This action cannot be undone. The user's data will be permanently removed.</p>
+              </div>
+            </div>
+            <div className="ap-modal-foot">
+              <button className="ap-btn-secondary" onClick={() => setDeleteConfirm(null)}>Cancel</button>
+              <button className="ap-btn-primary" style={{background:'#dc2626'}} onClick={() => handleDelete(deleteConfirm)}>🗑️ Delete User</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
