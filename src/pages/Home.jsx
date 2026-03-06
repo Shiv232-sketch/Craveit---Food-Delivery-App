@@ -16,9 +16,9 @@ export default function Home({ navigate }) {
               { label: 'Main Course', image: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?auto=format&fit=crop&w=400&q=80' },
               { label: 'Biryani',     image: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?auto=format&fit=crop&w=400&q=80' },
               { label: 'Starters',   image: 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=400&q=80' },
-              { label: 'Breads',     image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?auto=format&fit=crop&w=400&q=80' },
+              { label: 'Breads',     image: 'https://i.pinimg.com/1200x/3b/6f/e4/3b6fe4c72fcf4881a9eae88598a1c0a4.jpg' },
               { label: 'Desserts',   image: 'https://i.pinimg.com/avif/1200x/04/3e/f8/043ef80ed6c4c1ad98be030f1c5afead.avf' },
-              { label: 'Drinks',     image: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=400&q=80' },
+              { label: 'Drinks',     image: 'https://i.pinimg.com/1200x/97/25/ec/9725eca29432bd79fc5dbc34d1dffc75.jpg' },
             ].map(cat => (
               <div key={cat.label} className="category-card" onClick={() => navigate('menu')}>
                 <div className="cat-img-wrap">

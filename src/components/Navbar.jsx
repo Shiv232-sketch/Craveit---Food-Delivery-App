@@ -99,6 +99,9 @@ export default function Navbar({ navigate, activePage }) {
                   <button className="user-dropdown-item" onClick={() => { navigate('menu'); setUserMenuOpen(false); }}>
                     🍔 Browse Menu
                   </button>
+                  <button className="user-dropdown-item" onClick={() => { navigate('admin'); setUserMenuOpen(false); }}>
+                    ⚙️ Admin Panel
+                  </button>
                   <div className="user-dropdown-divider" />
                   <button className="user-dropdown-item logout" onClick={handleLogout}>
                     🚪 Sign Out

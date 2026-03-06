@@ -1,0 +1,474 @@
+import React, { useState } from 'react';
+import { MENU_ITEMS } from './Menu';
+import { useOrders } from '../context/OrderContext';
+
+const FAKE_USERS = [
+  { id:1, name:'Rohit Sharma',  email:'rohit@gmail.com',  phone:'9876543210', orders:8,  spent:4820, joined:'Jan 2026' },
+  { id:2, name:'Priya Singh',   email:'priya@gmail.com',  phone:'9765432109', orders:5,  spent:2340, joined:'Feb 2026' },
+  { id:3, name:'Arjun Mehta',   email:'arjun@yahoo.com',  phone:'9654321098', orders:12, spent:8760, joined:'Dec 2025' },
+  { id:4, name:'Sneha Gupta',   email:'sneha@gmail.com',  phone:'9543210987', orders:3,  spent:1290, joined:'Mar 2026' },
+  { id:5, name:'Vikram Yadav',  email:'vikram@yahoo.com', phone:'9432109876', orders:7,  spent:3870, joined:'Jan 2026' },
+];
+
+const FAKE_COUPONS_INIT = [
+  { id:1, code:'NEWUSER', type:'percentage', value:10, minOrder:200, used:24, limit:null, expiry:'2026-12-31', active:true },
+  { id:2, code:'FLAT50',  type:'flat',       value:50, minOrder:300, used:56, limit:100,  expiry:'2026-06-30', active:true },
+  { id:3, code:'SAVE20',  type:'percentage', value:20, minOrder:500, used:12, limit:50,   expiry:'2026-04-30', active:true },
+];
+
+const STATUS_COLORS = {
+  placed:    { bg:'#eff6ff', color:'#3b82f6', label:'Placed' },
+  confirmed: { bg:'#fef3c7', color:'#d97706', label:'Confirmed' },
+  preparing: { bg:'#fff7ed', color:'#ea580c', label:'Preparing' },
+  pickup:    { bg:'#fdf4ff', color:'#9333ea', label:'Out for Delivery' },
+  delivered: { bg:'#f0fdf4', color:'#16a34a', label:'Delivered' },
+  cancelled: { bg:'#fef2f2', color:'#dc2626', label:'Cancelled' },
+};
+const NEXT = { placed:'confirmed', confirmed:'preparing', preparing:'pickup', pickup:'delivered' };
+
+// ── Dashboard ──
+function Dashboard({ orders, menuItems }) {
+  const delivered = orders.filter(o => o.status === 'delivered');
+  const totalRevenue = delivered.reduce((s,o) => s + (o.pricing?.grandTotal || 0), 0);
+  const activeOrders = orders.filter(o => !['delivered','cancelled'].includes(o.status)).length;
+
+  const stats = [
+    { label:'Total Revenue',    value:`₹${totalRevenue.toLocaleString()}`, icon:'💰', color:'#22c55e', sub:'From delivered orders' },
+    { label:'Total Orders',     value:orders.length,   icon:'📦', color:'#3b82f6', sub:'All time' },
+    { label:'Active Orders',    value:activeOrders,    icon:'🔥', color:'#E8401C', sub:'In progress' },
+    { label:'Menu Items',       value:menuItems.length,icon:'🍽️', color:'#f59e0b', sub:`${menuItems.filter(i=>i.isVeg).length} veg · ${menuItems.filter(i=>!i.isVeg).length} non-veg` },
+    { label:'Registered Users', value:FAKE_USERS.length,icon:'👥',color:'#8b5cf6', sub:'Customers' },
+    { label:'Avg Order Value',  value:orders.length ? `₹${Math.round(orders.reduce((s,o)=>s+(o.pricing?.grandTotal||0),0)/orders.length)}` : '₹0', icon:'📊', color:'#06b6d4', sub:'Per order' },
+  ];
+
+  return (
+    <div className="ap-section">
+      <div className="ap-section-head">
+        <h2>Dashboard Overview</h2>
+        <span className="ap-badge live">● Live</span>
+      </div>
+      <div className="ap-stats-grid">
+        {stats.map(s => (
+          <div key={s.label} className="ap-stat-card" style={{'--stat-color':s.color}}>
+            <div className="ap-stat-icon">{s.icon}</div>
+            <div className="ap-stat-info">
+              <p className="ap-stat-value">{s.value}</p>
+              <p className="ap-stat-label">{s.label}</p>
+              <p className="ap-stat-sub">{s.sub}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="ap-dash-grid">
+        <div className="ap-card">
+          <div className="ap-card-head"><h3>Recent Orders</h3><span className="ap-count">{orders.length}</span></div>
+          {orders.length === 0 ? (
+            <div className="ap-empty">No orders yet. Orders placed by customers will appear here.</div>
+          ) : (
+            <div className="ap-table-wrap">
+              <table className="ap-table">
+                <thead><tr><th>Order ID</th><th>Customer</th><th>Total</th><th>Status</th><th>Time</th></tr></thead>
+                <tbody>
+                  {orders.slice(0,6).map(o => (
+                    <tr key={o.id}>
+                      <td><span className="ap-order-id">{o.id}</span></td>
+                      <td>{o.customer}</td>
+                      <td><strong>₹{o.pricing?.grandTotal}</strong></td>
+                      <td><span className="ap-status-pill" style={{background:STATUS_COLORS[o.status]?.bg,color:STATUS_COLORS[o.status]?.color}}>{STATUS_COLORS[o.status]?.label}</span></td>
+                      <td className="ap-muted">{new Date(o.placedAt).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <div className="ap-card">
+          <div className="ap-card-head"><h3>Top Selling Dishes</h3></div>
+          <div className="ap-top-dishes">
+            {menuItems.slice(0,5).map((item,i) => (
+              <div key={item.id} className="ap-top-dish">
+                <span className="ap-top-rank">#{i+1}</span>
+                <img src={item.image} alt={item.name} className="ap-dish-thumb" onError={e=>e.target.style.display='none'} />
+                <div className="ap-dish-info">
+                  <p className="ap-dish-name">{item.name}</p>
+                  <p className="ap-dish-cat">{item.category}</p>
+                </div>
+                <div className="ap-dish-stats">
+                  <p className="ap-dish-orders">{40-i*5} orders</p>
+                  <p className="ap-dish-rev">₹{(item.price*(40-i*5)).toLocaleString()}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Menu Management ──
+function MenuManagement({ menuItems, setMenuItems }) {
+  const [showForm, setShowForm] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [search, setSearch] = useState('');
+  const [form, setForm] = useState({ name:'', category:'Main Course', price:'', isVeg:true, description:'', image:'' });
+  const CATS = ['Main Course','Biryani','Starters','Breads','Desserts','Drinks'];
+  const filtered = menuItems.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
+
+  const openAdd = () => { setForm({ name:'', category:'Main Course', price:'', isVeg:true, description:'', image:'' }); setEditItem(null); setShowForm(true); };
+  const openEdit = (item) => { setForm({ name:item.name, category:item.category, price:item.price, isVeg:item.isVeg, description:item.description, image:item.image||'' }); setEditItem(item.id); setShowForm(true); };
+
+  const handleSave = () => {
+    if (!form.name || !form.price) return;
+    if (editItem) {
+      setMenuItems(prev => prev.map(i => i.id===editItem ? {...i,...form,price:Number(form.price)} : i));
+    } else {
+      setMenuItems(prev => [...prev, {...form, id:Date.now(), price:Number(form.price)}]);
+    }
+    setShowForm(false);
+  };
+
+  const handleDelete = (id) => { if (window.confirm('Delete this item?')) setMenuItems(prev => prev.filter(i => i.id!==id)); };
+  const toggleAvail = (id) => setMenuItems(prev => prev.map(i => i.id===id ? {...i, isAvailable:!(i.isAvailable!==false)} : i));
+
+  return (
+    <div className="ap-section">
+      <div className="ap-section-head">
+        <h2>Menu Management</h2>
+        <div style={{display:'flex',gap:'0.75rem',alignItems:'center'}}>
+          <input className="ap-search" placeholder="🔍 Search dishes..." value={search} onChange={e=>setSearch(e.target.value)} />
+          <button className="ap-btn-primary" onClick={openAdd}>+ Add Item</button>
+        </div>
+      </div>
+      <div className="ap-card">
+        <div className="ap-table-wrap">
+          <table className="ap-table">
+            <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Type</th><th>Availability</th><th>Actions</th></tr></thead>
+            <tbody>
+              {filtered.map(item => (
+                <tr key={item.id}>
+                  <td><img src={item.image} alt={item.name} className="ap-dish-thumb" onError={e=>e.target.style.display='none'} /></td>
+                  <td><strong>{item.name}</strong><br/><span className="ap-muted" style={{fontSize:'0.75rem'}}>{item.description?.slice(0,45)}...</span></td>
+                  <td><span className="ap-cat-tag">{item.category}</span></td>
+                  <td><strong>₹{item.price}</strong></td>
+                  <td><span className="ap-veg-dot">{item.isVeg ? '🟢 Veg' : '🔴 Non-Veg'}</span></td>
+                  <td><button className={`ap-toggle ${item.isAvailable!==false?'on':'off'}`} onClick={()=>toggleAvail(item.id)}>{item.isAvailable!==false?'Available':'Hidden'}</button></td>
+                  <td><div style={{display:'flex',gap:'0.4rem'}}>
+                    <button className="ap-icon-btn edit" onClick={()=>openEdit(item)}>✏️</button>
+                    <button className="ap-icon-btn delete" onClick={()=>handleDelete(item.id)}>🗑️</button>
+                  </div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {showForm && (
+        <div className="ap-modal-overlay" onClick={()=>setShowForm(false)}>
+          <div className="ap-modal" onClick={e=>e.stopPropagation()}>
+            <div className="ap-modal-head"><h3>{editItem?'Edit Item':'Add New Item'}</h3><button onClick={()=>setShowForm(false)}>✕</button></div>
+            <div className="ap-modal-body">
+              <div className="ap-form-row">
+                <div className="ap-field"><label>Item Name *</label><input placeholder="e.g. Butter Chicken" value={form.name} onChange={e=>setForm({...form,name:e.target.value})} /></div>
+                <div className="ap-field"><label>Price (₹) *</label><input type="number" placeholder="299" value={form.price} onChange={e=>setForm({...form,price:e.target.value})} /></div>
+              </div>
+              <div className="ap-form-row">
+                <div className="ap-field"><label>Category</label><select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>{CATS.map(c=><option key={c}>{c}</option>)}</select></div>
+                <div className="ap-field"><label>Type</label><select value={form.isVeg} onChange={e=>setForm({...form,isVeg:e.target.value==='true'})}><option value="true">🟢 Vegetarian</option><option value="false">🔴 Non-Vegetarian</option></select></div>
+              </div>
+              <div className="ap-field"><label>Image URL</label><input placeholder="https://images.unsplash.com/..." value={form.image} onChange={e=>setForm({...form,image:e.target.value})} /></div>
+              <div className="ap-field"><label>Description</label><textarea rows={3} placeholder="Describe the dish..." value={form.description} onChange={e=>setForm({...form,description:e.target.value})} /></div>
+              {form.image && <img src={form.image} alt="preview" className="ap-img-preview" onError={e=>e.target.style.display='none'} />}
+            </div>
+            <div className="ap-modal-foot">
+              <button className="ap-btn-secondary" onClick={()=>setShowForm(false)}>Cancel</button>
+              <button className="ap-btn-primary" onClick={handleSave}>{editItem?'Save Changes':'Add Item'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Orders (reads from shared OrderContext) ──
+function Orders() {
+  const { orders, updateOrderStatus } = useOrders();
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+
+  const filtered = orders.filter(o => {
+    const matchStatus = filter==='all' || o.status===filter;
+    const matchSearch = o.customer?.toLowerCase().includes(search.toLowerCase()) || o.id?.includes(search);
+    return matchStatus && matchSearch;
+  });
+
+  return (
+    <div className="ap-section">
+      <div className="ap-section-head">
+        <h2>Order Management</h2>
+        <input className="ap-search" placeholder="🔍 Search orders..." value={search} onChange={e=>setSearch(e.target.value)} />
+      </div>
+
+      {/* Status filter tabs */}
+      <div className="ap-filter-tabs">
+        {['all','placed','confirmed','preparing','pickup','delivered','cancelled'].map(s => (
+          <button key={s} className={`ap-filter-tab ${filter===s?'active':''}`} onClick={()=>setFilter(s)}>
+            {s==='all' ? 'All Orders' : STATUS_COLORS[s]?.label}
+            <span className="ap-tab-count">{s==='all' ? orders.length : orders.filter(o=>o.status===s).length}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="ap-card">
+        {orders.length === 0 ? (
+          <div className="ap-empty">
+            <div style={{fontSize:'2.5rem',marginBottom:'0.5rem'}}>📭</div>
+            <p>No orders yet. When customers place orders, they'll appear here in real time!</p>
+          </div>
+        ) : (
+          <div className="ap-table-wrap">
+            <table className="ap-table">
+              <thead><tr><th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th><th>Address</th><th>Payment</th><th>Status</th><th>Update Status</th></tr></thead>
+              <tbody>
+                {filtered.length === 0
+                  ? <tr><td colSpan={8} className="ap-empty">No orders match this filter.</td></tr>
+                  : filtered.map(o => (
+                  <tr key={o.id}>
+                    <td>
+                      <span className="ap-order-id">{o.id}</span>
+                      <br/><span className="ap-muted" style={{fontSize:'0.7rem'}}>{new Date(o.placedAt).toLocaleString('en-IN',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'})}</span>
+                    </td>
+                    <td>
+                      <div style={{display:'flex',alignItems:'center',gap:'0.5rem'}}>
+                        <div className="ap-user-avatar">{o.customer?.charAt(0)}</div>
+                        <div>
+                          <strong>{o.customer}</strong>
+                          <p className="ap-muted" style={{fontSize:'0.72rem'}}>{o.phone}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{display:'flex',flexDirection:'column',gap:'0.15rem'}}>
+                        {o.items?.slice(0,2).map((item,i) => (
+                          <span key={i} style={{fontSize:'0.75rem'}}>{item.name} ×{item.qty}</span>
+                        ))}
+                        {o.items?.length > 2 && <span className="ap-muted" style={{fontSize:'0.72rem'}}>+{o.items.length-2} more</span>}
+                      </div>
+                    </td>
+                    <td><strong>₹{o.pricing?.grandTotal}</strong><br/><span className="ap-muted" style={{fontSize:'0.72rem'}}>{o.payment?.method}</span></td>
+                    <td><span className="ap-muted" style={{fontSize:'0.75rem',maxWidth:'140px',display:'block'}}>{o.address}</span></td>
+                    <td><span className="ap-cat-tag">{o.payment?.method}</span></td>
+                    <td><span className="ap-status-pill" style={{background:STATUS_COLORS[o.status]?.bg,color:STATUS_COLORS[o.status]?.color}}>{STATUS_COLORS[o.status]?.label}</span></td>
+                    <td>
+                      <div style={{display:'flex',flexDirection:'column',gap:'0.3rem'}}>
+                        {NEXT[o.status] && (
+                          <button className="ap-btn-sm" onClick={()=>updateOrderStatus(o.id, NEXT[o.status])}>
+                            → {STATUS_COLORS[NEXT[o.status]]?.label}
+                          </button>
+                        )}
+                        {o.status==='placed' && (
+                          <button className="ap-btn-sm cancel" onClick={()=>updateOrderStatus(o.id,'cancelled')}>✕ Cancel</button>
+                        )}
+                        {o.status==='delivered' && <span style={{fontSize:'0.75rem',color:'#22c55e',fontWeight:700}}>✓ Done</span>}
+                        {o.status==='cancelled' && <span style={{fontSize:'0.75rem',color:'#dc2626',fontWeight:700}}>✗ Cancelled</span>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Users ──
+function Users() {
+  const { orders } = useOrders();
+  // Combine fake users with real order customers
+  const realCustomers = [...new Map(orders.map(o => [o.customer, {
+    id: o.id, name: o.customer, phone: o.phone||'—',
+    email: `${o.customer?.split(' ')[0]?.toLowerCase()}@gmail.com`,
+    orders: orders.filter(x=>x.customer===o.customer).length,
+    spent: orders.filter(x=>x.customer===o.customer).reduce((s,x)=>s+(x.pricing?.grandTotal||0),0),
+    joined: new Date(o.placedAt).toLocaleDateString('en-IN',{month:'short',year:'numeric'}),
+    isReal: true,
+  }])).values()];
+
+  const allUsers = [...realCustomers, ...FAKE_USERS.filter(u => !realCustomers.find(r=>r.name===u.name))];
+
+  return (
+    <div className="ap-section">
+      <div className="ap-section-head"><h2>User Management</h2><span className="ap-badge">{allUsers.length} users</span></div>
+      <div className="ap-card">
+        <div className="ap-table-wrap">
+          <table className="ap-table">
+            <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Orders</th><th>Total Spent</th><th>Joined</th></tr></thead>
+            <tbody>
+              {allUsers.map((u,i) => (
+                <tr key={i}>
+                  <td>
+                    <div style={{display:'flex',alignItems:'center',gap:'0.6rem'}}>
+                      <div className="ap-user-avatar" style={u.isReal?{background:'#22c55e'}:{}}>{u.name?.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
+                      <div>
+                        <strong>{u.name}</strong>
+                        {u.isReal && <span style={{fontSize:'0.7rem',color:'#22c55e',marginLeft:'0.4rem'}}>● Real</span>}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="ap-muted">{u.email}</td>
+                  <td className="ap-muted">{u.phone}</td>
+                  <td><span className="ap-badge">{u.orders} orders</span></td>
+                  <td><strong style={{color:'#22c55e'}}>₹{u.spent?.toLocaleString()}</strong></td>
+                  <td className="ap-muted">{u.joined}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Coupons ──
+function Coupons() {
+  const [coupons, setCoupons] = useState(FAKE_COUPONS_INIT);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ code:'', type:'percentage', value:'', minOrder:'', limit:'', expiry:'' });
+
+  const handleAdd = () => {
+    if (!form.code || !form.value) return;
+    setCoupons(prev => [...prev, { id:Date.now(), ...form, value:Number(form.value), minOrder:Number(form.minOrder)||0, used:0, active:true }]);
+    setShowForm(false);
+    setForm({ code:'', type:'percentage', value:'', minOrder:'', limit:'', expiry:'' });
+  };
+
+  return (
+    <div className="ap-section">
+      <div className="ap-section-head">
+        <h2>Coupon Management</h2>
+        <button className="ap-btn-primary" onClick={()=>setShowForm(true)}>+ Create Coupon</button>
+      </div>
+      <div className="ap-card">
+        <div className="ap-table-wrap">
+          <table className="ap-table">
+            <thead><tr><th>Code</th><th>Discount</th><th>Min Order</th><th>Used</th><th>Limit</th><th>Expiry</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              {coupons.map(c => (
+                <tr key={c.id}>
+                  <td><span className="ap-coupon-code">{c.code}</span></td>
+                  <td><strong>{c.type==='percentage'?`${c.value}% OFF`:`₹${c.value} OFF`}</strong></td>
+                  <td>₹{c.minOrder}</td>
+                  <td>{c.used} times</td>
+                  <td>{c.limit||'∞'}</td>
+                  <td className="ap-muted">{c.expiry}</td>
+                  <td><span className={`ap-status-pill ${c.active?'active-coupon':'inactive-coupon'}`}>{c.active?'✓ Active':'✗ Inactive'}</span></td>
+                  <td><div style={{display:'flex',gap:'0.4rem'}}>
+                    <button className="ap-icon-btn edit" onClick={()=>setCoupons(prev=>prev.map(x=>x.id===c.id?{...x,active:!x.active}:x))}>{c.active?'⏸':'▶'}</button>
+                    <button className="ap-icon-btn delete" onClick={()=>setCoupons(prev=>prev.filter(x=>x.id!==c.id))}>🗑️</button>
+                  </div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {showForm && (
+        <div className="ap-modal-overlay" onClick={()=>setShowForm(false)}>
+          <div className="ap-modal" onClick={e=>e.stopPropagation()}>
+            <div className="ap-modal-head"><h3>Create Coupon</h3><button onClick={()=>setShowForm(false)}>✕</button></div>
+            <div className="ap-modal-body">
+              <div className="ap-form-row">
+                <div className="ap-field"><label>Coupon Code *</label><input placeholder="e.g. SAVE20" value={form.code} onChange={e=>setForm({...form,code:e.target.value.toUpperCase()})} /></div>
+                <div className="ap-field"><label>Type</label><select value={form.type} onChange={e=>setForm({...form,type:e.target.value})}><option value="percentage">Percentage (%)</option><option value="flat">Flat (₹)</option></select></div>
+              </div>
+              <div className="ap-form-row">
+                <div className="ap-field"><label>Value *</label><input type="number" placeholder={form.type==='percentage'?'e.g. 20':'e.g. 50'} value={form.value} onChange={e=>setForm({...form,value:e.target.value})} /></div>
+                <div className="ap-field"><label>Min Order (₹)</label><input type="number" placeholder="0" value={form.minOrder} onChange={e=>setForm({...form,minOrder:e.target.value})} /></div>
+              </div>
+              <div className="ap-form-row">
+                <div className="ap-field"><label>Usage Limit</label><input type="number" placeholder="Unlimited" value={form.limit} onChange={e=>setForm({...form,limit:e.target.value})} /></div>
+                <div className="ap-field"><label>Expiry Date</label><input type="date" value={form.expiry} onChange={e=>setForm({...form,expiry:e.target.value})} /></div>
+              </div>
+            </div>
+            <div className="ap-modal-foot">
+              <button className="ap-btn-secondary" onClick={()=>setShowForm(false)}>Cancel</button>
+              <button className="ap-btn-primary" onClick={handleAdd}>Create Coupon</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════
+//  MAIN ADMIN PANEL
+// ════════════════════════════════════════
+export default function AdminPanel({ onLogout }) {
+  const { orders } = useOrders();
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [menuItems, setMenuItems] = useState(MENU_ITEMS);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const activeCount = orders.filter(o => !['delivered','cancelled'].includes(o.status)).length;
+
+  const NAV = [
+    { key:'dashboard', icon:'📊', label:'Dashboard' },
+    { key:'menu',      icon:'🍽️', label:'Menu Items' },
+    { key:'orders',    icon:'📦', label:'Orders', badge: activeCount },
+    { key:'users',     icon:'👥', label:'Users' },
+    { key:'coupons',   icon:'🏷️', label:'Coupons' },
+  ];
+
+  return (
+    <div className="admin-panel">
+      <aside className={`ap-sidebar ${sidebarOpen?'':'collapsed'}`}>
+        <div className="ap-sidebar-brand">
+          <span className="ap-brand-icon">🔥</span>
+          {sidebarOpen && <span className="ap-brand-name">CraveIt</span>}
+        </div>
+        {sidebarOpen && <p className="ap-sidebar-sub">Admin Panel</p>}
+        <nav className="ap-nav">
+          {NAV.map(n => (
+            <button key={n.key} className={`ap-nav-item ${activeTab===n.key?'active':''}`}
+              onClick={()=>setActiveTab(n.key)} title={n.label}>
+              <span className="ap-nav-icon">{n.icon}</span>
+              {sidebarOpen && <span className="ap-nav-label">{n.label}</span>}
+              {n.badge > 0 && <span className="ap-nav-badge">{n.badge}</span>}
+            </button>
+          ))}
+        </nav>
+        <div className="ap-sidebar-footer">
+          <button className="ap-nav-item" onClick={onLogout}>
+            <span className="ap-nav-icon">🚪</span>
+            {sidebarOpen && <span className="ap-nav-label">Logout</span>}
+          </button>
+        </div>
+      </aside>
+
+      <div className="ap-main">
+        <div className="ap-topbar">
+          <button className="ap-collapse-btn" onClick={()=>setSidebarOpen(o=>!o)}>{sidebarOpen?'◀':'▶'}</button>
+          <div className="ap-topbar-title">{NAV.find(n=>n.key===activeTab)?.icon} {NAV.find(n=>n.key===activeTab)?.label}</div>
+          <div className="ap-topbar-right">
+            {activeCount > 0 && <span className="ap-badge live" style={{marginRight:'0.75rem'}}>● {activeCount} active</span>}
+            <span className="ap-admin-chip">👨‍💼 Admin</span>
+          </div>
+        </div>
+        <div className="ap-content">
+          {activeTab==='dashboard' && <Dashboard orders={orders} menuItems={menuItems} />}
+          {activeTab==='menu'      && <MenuManagement menuItems={menuItems} setMenuItems={setMenuItems} />}
+          {activeTab==='orders'    && <Orders />}
+          {activeTab==='users'     && <Users />}
+          {activeTab==='coupons'   && <Coupons />}
+        </div>
+      </div>
+    </div>
+  );
+}

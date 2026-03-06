@@ -70,7 +70,7 @@ export default function PaymentModal({ onClose, onSuccess, deliveryAddress, addr
           <div className="success-row addr-row-success"><span>Delivering to</span><strong>{addrIcon} {deliveryAddress}</strong></div>
         </div>
         <p className="success-msg">Redirecting to live order tracking...</p>
-        <button className="btn-pay success-btn" onClick={() => onSuccess(orderId)}>
+        <button className="btn-pay success-btn" onClick={() => onSuccess(method)}>
           🚀 Track My Order Live
         </button>
       </div>
