@@ -1,38 +1,94 @@
-import React from 'react';
+import React, { useState } from 'react';
+
+const HIW_STEPS = [
+  {
+    step: '01', icon: '🍽️', title: 'Browse Menu',
+    front: 'Browse our Indian menu',
+    back: 'Filter by category, veg or non-veg, or search for your favourite dish. 16+ authentic Indian dishes available.',
+    color: '#6366f1',
+  },
+  {
+    step: '02', icon: '🛒', title: 'Add to Cart',
+    front: 'Pick your favourites',
+    back: 'Add items, adjust quantities and apply a coupon code. Your cart saves everything until checkout.',
+    color: '#f59e0b',
+  },
+  {
+    step: '03', icon: '📍', title: 'Enter Address',
+    front: 'Tell us where to deliver',
+    back: 'Enter your Home, Work or Other address. We deliver right to your doorstep across the city.',
+    color: '#E8401C',
+  },
+  {
+    step: '04', icon: '💳', title: 'Pay Securely',
+    front: 'Choose how to pay',
+    back: 'Pay via Card, UPI, Net Banking or Wallet. All transactions are 256-bit SSL encrypted for safety.',
+    color: '#0ea5e9',
+  },
+  {
+    step: '05', icon: '🔐', title: 'Get Your OTP',
+    front: 'Your secret delivery code',
+    back: 'A unique 6-digit OTP is sent to you. Share it only with your rider to confirm safe delivery.',
+    color: '#ec4899',
+  },
+  {
+    step: '06', icon: '🚀', title: 'Track Live',
+    front: 'Watch it come to you',
+    back: 'Follow every step in real-time — Order Placed → Preparing → Picked Up → Delivered. Live updates!',
+    color: '#22c55e',
+  },
+];
+
+function HowItWorksCards() {
+  const [flipped, setFlipped] = useState(null);
+
+  const toggle = (i) => setFlipped(flipped === i ? null : i);
+
+  return (
+    <div className="hiw-cards-grid">
+      {HIW_STEPS.map((s, i) => (
+        <div
+          key={s.step}
+          className={`hiw-card ${flipped === i ? 'flipped' : ''}`}
+          onClick={() => toggle(i)}
+          style={{ '--card-color': s.color }}
+        >
+          <div className="hiw-card-inner">
+            {/* Front */}
+            <div className="hiw-card-front">
+              <div className="hiw-card-num">{s.step}</div>
+              <div className="hiw-card-icon">{s.icon}</div>
+              <h4>{s.title}</h4>
+              <p>{s.front}</p>
+              <span className="hiw-card-hint">Click to learn more</span>
+            </div>
+            {/* Back */}
+            <div className="hiw-card-back">
+              <div className="hiw-card-icon big">{s.icon}</div>
+              <h4>{s.title}</h4>
+              <p>{s.back}</p>
+              <span className="hiw-card-hint">Click to flip back</span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function Footer({ navigate }) {
-  const steps = [
-    { step: '01', icon: '🍽️', title: 'Browse Menu',     desc: 'Explore our wide variety of fresh dishes — filter by category, veg/non-veg, or search for your favourite.' },
-    { step: '02', icon: '🛒', title: 'Add to Cart',      desc: 'Select your items, adjust quantities, and apply a coupon code for extra savings on your order.' },
-    { step: '03', icon: '📍', title: 'Enter Address',    desc: 'Add your delivery address — Home, Work, or Other. We deliver right to your doorstep.' },
-    { step: '04', icon: '💳', title: 'Pay Securely',     desc: 'Pay via Card, UPI, Net Banking, or Wallet. All transactions are 256-bit SSL encrypted.' },
-    { step: '05', icon: '🔐', title: 'Get Your OTP',     desc: 'Receive a unique delivery OTP. Share it with your rider to confirm safe receipt of your order.' },
-    { step: '06', icon: '🚀', title: 'Track Live',       desc: 'Watch your order go from kitchen to your door in real time — every step of the way.' },
-  ];
 
   return (
     <footer className="footer">
 
-      {/* ── How It Works Strip ── */}
+      {/* ── How It Works — Flashcards ── */}
       <div className="footer-hiw">
         <div className="footer-hiw-inner">
           <div className="footer-hiw-header">
             <h3>How It Works</h3>
-            <p>From craving to delivery in 6 simple steps</p>
+            <p>Click each card to learn more</p>
           </div>
-          <div className="footer-hiw-steps">
-            {steps.map((s, i) => (
-              <div key={s.step} className="footer-hiw-step">
-                <div className="footer-hiw-top">
-                  <div className="footer-hiw-num">{s.step}</div>
-                  <div className="footer-hiw-icon">{s.icon}</div>
-                  {i < steps.length - 1 && <div className="footer-hiw-connector" />}
-                </div>
-                <h4>{s.title}</h4>
-                <p>{s.desc}</p>
-              </div>
-            ))}
-          </div>
+          <HowItWorksCards />
         </div>
       </div>
 
@@ -66,9 +122,9 @@ export default function Footer({ navigate }) {
           {/* How It Works mini */}
           <div className="footer-col">
             <h4>How It Works</h4>
-            {steps.slice(0,4).map(s => (
+            {HIW_STEPS.slice(0,4).map(s => (
               <div key={s.step} className="footer-mini-step">
-                <span className="footer-mini-num">{s.step}</span>
+                <span className="footer-mini-num" style={{background: s.color + '22', color: s.color}}>{s.step}</span>
                 <span>{s.title}</span>
               </div>
             ))}
