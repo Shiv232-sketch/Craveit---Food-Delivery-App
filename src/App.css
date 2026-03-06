@@ -1639,3 +1639,40 @@ main { flex: 1; padding-top: 72px; }
   .ap-sidebar { width: 60px; }
   .ap-brand-name, .ap-sidebar-sub, .ap-nav-label { display: none; }
 }
+
+/* ── Order Cancelled State ── */
+.order-badge.cancelled {
+  background: rgba(239,68,68,0.1);
+  color: #dc2626;
+  border: 1px solid rgba(239,68,68,0.25);
+}
+
+.cancelled-timeline {
+  text-align: center;
+  padding: 2rem 1.5rem;
+}
+.cancelled-icon {
+  font-size: 3rem;
+  margin-bottom: 0.75rem;
+}
+.cancelled-timeline h3 {
+  font-family: var(--font-head);
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #dc2626;
+  margin-bottom: 0.5rem;
+}
+.cancelled-timeline p {
+  color: var(--gray);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.cancelled-refund {
+  margin-top: 0.75rem;
+  background: rgba(239,68,68,0.06);
+  border: 1px solid rgba(239,68,68,0.15);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-size: 0.82rem !important;
+  color: #dc2626 !important;
+}

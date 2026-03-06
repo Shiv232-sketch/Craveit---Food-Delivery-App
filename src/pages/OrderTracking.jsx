@@ -27,11 +27,12 @@ export default function OrderTracking({ activeOrderId }) {
     : 0;
 
   const isDelivered  = order?.status === 'delivered';
+  const isCancelled  = order?.status === 'cancelled';
   const isRiderPickedUp = currentStep >= 3;
 
-  // OTP countdown
+  // OTP countdown — stop if delivered OR cancelled
   useEffect(() => {
-    if (isDelivered || !order) return;
+    if (isDelivered || isCancelled || !order) return;
     const interval = setInterval(() => {
       setOtpTimer(t => {
         if (t <= 1) { refreshOTP(); return 30; }
@@ -85,8 +86,8 @@ export default function OrderTracking({ activeOrderId }) {
                 <p className="order-id-value">{order.id}</p>
               </div>
               <div>
-                <span className={`order-badge ${isDelivered ? 'delivered' : 'active'}`}>
-                  {isDelivered ? '✓ Delivered' : '● Live'}
+                <span className={`order-badge ${isDelivered ? 'delivered' : isCancelled ? 'cancelled' : 'active'}`}>
+                  {isDelivered ? '✓ Delivered' : isCancelled ? '✕ Cancelled' : '● Live'}
                 </span>
               </div>
             </div>
@@ -94,6 +95,14 @@ export default function OrderTracking({ activeOrderId }) {
             {/* Timeline */}
             <div className="tracking-timeline-card">
               <h3 className="tracking-card-title">Order Status</h3>
+              {isCancelled ? (
+                <div className="cancelled-timeline">
+                  <div className="cancelled-icon">❌</div>
+                  <h3>Order Cancelled</h3>
+                  <p>We're sorry! The restaurant has cancelled your order.</p>
+                  <p className="cancelled-refund">💳 If you paid online, your refund will be processed within 3–5 business days.</p>
+                </div>
+              ) : (
               <div className="timeline">
                 {STATUSES.map((status, i) => (
                   <div key={status.key}
@@ -120,6 +129,7 @@ export default function OrderTracking({ activeOrderId }) {
                   </div>
                 ))}
               </div>
+              )}
             </div>
 
             {/* Delivery Address */}
@@ -142,6 +152,8 @@ export default function OrderTracking({ activeOrderId }) {
           <div className="tracking-right">
 
             {/* OTP Card */}
+            {/* OTP Card — hidden when cancelled */}
+            {!isCancelled && (
             <div className={`otp-card ${isDelivered ? 'otp-done' : ''}`}>
               {!isDelivered ? (
                 <>
@@ -191,6 +203,7 @@ export default function OrderTracking({ activeOrderId }) {
                 </div>
               )}
             </div>
+            )} {/* end !isCancelled */}
 
             {/* Order Items */}
             {order.items?.length > 0 && (
