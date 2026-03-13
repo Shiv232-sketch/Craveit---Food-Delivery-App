@@ -10,11 +10,6 @@ const FAKE_USERS = [
   { id:5, name:'Vikram Yadav',  email:'vikram@yahoo.com', phone:'9432109876', orders:7,  spent:3870, joined:'Jan 2026' },
 ];
 
-const FAKE_COUPONS_INIT = [
-  { id:1, code:'NEWUSER', type:'percentage', value:10, minOrder:200, used:24, limit:null, expiry:'2026-12-31', active:true },
-  { id:2, code:'FLAT50',  type:'flat',       value:50, minOrder:300, used:56, limit:100,  expiry:'2026-06-30', active:true },
-  { id:3, code:'SAVE20',  type:'percentage', value:20, minOrder:500, used:12, limit:50,   expiry:'2026-04-30', active:true },
-];
 
 const STATUS_COLORS = {
   placed:    { bg:'#eff6ff', color:'#3b82f6', label:'Placed' },
@@ -359,7 +354,6 @@ function Users() {
                       <div className="ap-user-avatar" style={u.isReal?{background:'#22c55e'}:{}}>{u.name?.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
                       <div>
                         <strong>{u.name}</strong>
-                        {u.isReal && <span style={{fontSize:'0.7rem',color:'#22c55e',marginLeft:'0.4rem'}}>● Real</span>}
                       </div>
                     </div>
                   </td>
@@ -397,7 +391,6 @@ function Users() {
                 </div>
                 <div>
                   <p style={{fontWeight:700,color:'var(--dark)'}}>{form.name || 'User Name'}</p>
-                  {editUser?.isReal && <span style={{fontSize:'0.75rem',color:'#22c55e'}}>● Real customer</span>}
                 </div>
               </div>
               <div className="ap-field">
@@ -447,77 +440,6 @@ function Users() {
   );
 }
 
-// ── Coupons ──
-function Coupons() {
-  const [coupons, setCoupons] = useState(FAKE_COUPONS_INIT);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ code:'', type:'percentage', value:'', minOrder:'', limit:'', expiry:'' });
-
-  const handleAdd = () => {
-    if (!form.code || !form.value) return;
-    setCoupons(prev => [...prev, { id:Date.now(), ...form, value:Number(form.value), minOrder:Number(form.minOrder)||0, used:0, active:true }]);
-    setShowForm(false);
-    setForm({ code:'', type:'percentage', value:'', minOrder:'', limit:'', expiry:'' });
-  };
-
-  return (
-    <div className="ap-section">
-      <div className="ap-section-head">
-        <h2>Coupon Management</h2>
-        <button className="ap-btn-primary" onClick={()=>setShowForm(true)}>+ Create Coupon</button>
-      </div>
-      <div className="ap-card">
-        <div className="ap-table-wrap">
-          <table className="ap-table">
-            <thead><tr><th>Code</th><th>Discount</th><th>Min Order</th><th>Used</th><th>Limit</th><th>Expiry</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-              {coupons.map(c => (
-                <tr key={c.id}>
-                  <td><span className="ap-coupon-code">{c.code}</span></td>
-                  <td><strong>{c.type==='percentage'?`${c.value}% OFF`:`₹${c.value} OFF`}</strong></td>
-                  <td>₹{c.minOrder}</td>
-                  <td>{c.used} times</td>
-                  <td>{c.limit||'∞'}</td>
-                  <td className="ap-muted">{c.expiry}</td>
-                  <td><span className={`ap-status-pill ${c.active?'active-coupon':'inactive-coupon'}`}>{c.active?'✓ Active':'✗ Inactive'}</span></td>
-                  <td><div style={{display:'flex',gap:'0.4rem'}}>
-                    <button className="ap-icon-btn edit" onClick={()=>setCoupons(prev=>prev.map(x=>x.id===c.id?{...x,active:!x.active}:x))}>{c.active?'⏸':'▶'}</button>
-                    <button className="ap-icon-btn delete" onClick={()=>setCoupons(prev=>prev.filter(x=>x.id!==c.id))}>🗑️</button>
-                  </div></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {showForm && (
-        <div className="ap-modal-overlay" onClick={()=>setShowForm(false)}>
-          <div className="ap-modal" onClick={e=>e.stopPropagation()}>
-            <div className="ap-modal-head"><h3>Create Coupon</h3><button onClick={()=>setShowForm(false)}>✕</button></div>
-            <div className="ap-modal-body">
-              <div className="ap-form-row">
-                <div className="ap-field"><label>Coupon Code *</label><input placeholder="e.g. SAVE20" value={form.code} onChange={e=>setForm({...form,code:e.target.value.toUpperCase()})} /></div>
-                <div className="ap-field"><label>Type</label><select value={form.type} onChange={e=>setForm({...form,type:e.target.value})}><option value="percentage">Percentage (%)</option><option value="flat">Flat (₹)</option></select></div>
-              </div>
-              <div className="ap-form-row">
-                <div className="ap-field"><label>Value *</label><input type="number" placeholder={form.type==='percentage'?'e.g. 20':'e.g. 50'} value={form.value} onChange={e=>setForm({...form,value:e.target.value})} /></div>
-                <div className="ap-field"><label>Min Order (₹)</label><input type="number" placeholder="0" value={form.minOrder} onChange={e=>setForm({...form,minOrder:e.target.value})} /></div>
-              </div>
-              <div className="ap-form-row">
-                <div className="ap-field"><label>Usage Limit</label><input type="number" placeholder="Unlimited" value={form.limit} onChange={e=>setForm({...form,limit:e.target.value})} /></div>
-                <div className="ap-field"><label>Expiry Date</label><input type="date" value={form.expiry} onChange={e=>setForm({...form,expiry:e.target.value})} /></div>
-              </div>
-            </div>
-            <div className="ap-modal-foot">
-              <button className="ap-btn-secondary" onClick={()=>setShowForm(false)}>Cancel</button>
-              <button className="ap-btn-primary" onClick={handleAdd}>Create Coupon</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ════════════════════════════════════════
 //  MAIN ADMIN PANEL
@@ -535,7 +457,6 @@ export default function AdminPanel({ onLogout }) {
     { key:'menu',      icon:'🍽️', label:'Menu Items' },
     { key:'orders',    icon:'📦', label:'Orders', badge: activeCount },
     { key:'users',     icon:'👥', label:'Users' },
-    { key:'coupons',   icon:'🏷️', label:'Coupons' },
   ];
 
   return (
@@ -578,7 +499,6 @@ export default function AdminPanel({ onLogout }) {
           {activeTab==='menu'      && <MenuManagement menuItems={menuItems} setMenuItems={setMenuItems} />}
           {activeTab==='orders'    && <Orders />}
           {activeTab==='users'     && <Users />}
-          {activeTab==='coupons'   && <Coupons />}
         </div>
       </div>
     </div>

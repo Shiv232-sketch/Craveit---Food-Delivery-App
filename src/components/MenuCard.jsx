@@ -10,7 +10,7 @@ export default function MenuCard({ item }) {
 
   const handleAdd = () => {
     addToCart(item);
-    setAdded(true);
+    setAdded(true); 
     setTimeout(() => setAdded(false), 1200);
   };
 
