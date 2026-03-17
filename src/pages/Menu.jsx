@@ -1,8 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MenuCard from '../components/MenuCard';
 
+const API = process.env.REACT_APP_API_URL
+  ? `${process.env.REACT_APP_API_URL}/api`
+  : 'http://localhost:5000/api';
+
+// Keep hardcoded items as fallback (when backend is offline)
 export const MENU_ITEMS = [
-  // ── Main Course ──
   {
     id: 1, name: 'Butter Chicken',
     category: 'Main Course', price: 299, isVeg: false,
@@ -13,7 +17,7 @@ export const MENU_ITEMS = [
     id: 2, name: 'Palak Paneer',
     category: 'Main Course', price: 249, isVeg: true,
     description: 'Fresh cottage cheese cubes in a smooth, spiced spinach gravy. Healthy and delicious.',
-    image: 'https://i.pinimg.com/1200x/9e/d9/69/9ed96987f12746224c05acbc079f34f8.jpg',
+    image: 'https://i.pinimg.com/1200x/a7/bb/29/a7bb29a06c102c4eb5b94113393c521f.jpg',
   },
   {
     id: 3, name: 'Dal Makhani',
@@ -39,13 +43,13 @@ export const MENU_ITEMS = [
     id: 6, name: 'Veg Dum Biryani',
     category: 'Biryani', price: 279, isVeg: true,
     description: 'Aromatic basmati rice slow-cooked with mixed vegetables, whole spices and fresh herbs.',
-    image: 'https://i.pinimg.com/736x/f6/2b/85/f62b85c80d2b23c54299ac4c7e55f015.jpg',
+    image: 'https://images.unsplash.com/photo-1596797038530-2c107229654b?auto=format&fit=crop&w=500&q=80',
   },
   {
     id: 7, name: 'Mutton Biryani',
     category: 'Biryani', price: 399, isVeg: false,
     description: 'Tender mutton pieces slow-cooked with long-grain basmati rice and Awadhi spices.',
-    image: 'https://images.unsplash.com/photo-1633945274405-b6c8069047b0?auto=format&fit=crop&w=500&q=80',
+    image: 'https://i.pinimg.com/1200x/4d/ff/58/4dff58c766b2ebb7bc8f0639857fb606.jpg',
   },
 
   // ── Starters ──
@@ -53,7 +57,7 @@ export const MENU_ITEMS = [
     id: 8, name: 'Paneer Tikka',
     category: 'Starters', price: 229, isVeg: true,
     description: 'Marinated paneer cubes grilled in tandoor with peppers and onions. Served with mint chutney.',
-    image: 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?auto=format&fit=crop&w=500&q=80',
+    image: 'https://i.pinimg.com/1200x/b5/5d/6f/b55d6f1c767cd0d9b1a60646afeac3e1.jpg',
   },
   {
     id: 9, name: 'Samosa (2 pcs)',
@@ -73,13 +77,13 @@ export const MENU_ITEMS = [
     id: 11, name: 'Butter Naan',
     category: 'Breads', price: 59, isVeg: true,
     description: 'Soft, pillowy leavened bread baked fresh in a clay tandoor and finished with butter.',
-    image: 'https://i.pinimg.com/1200x/2d/a9/1f/2da91f6ba703b9a7fd6b6264db7a9fc1.jpg',
+    image: 'https://i.pinimg.com/1200x/ff/58/52/ff585212e6577fd3bd64cc109f13bbdb.jpg',
   },
   {
     id: 12, name: 'Garlic Naan',
     category: 'Breads', price: 69, isVeg: true,
     description: 'Tandoor-baked flatbread topped with fresh garlic, butter and coriander leaves.',
-    image: 'https://i.pinimg.com/1200x/c3/98/b1/c398b1367a78955ae6f7edd80107cf18.jpg',
+    image: 'https://i.pinimg.com/1200x/c4/23/fd/c423fd0afd69b890610b464668c1187e.jpg',
   },
 
   // ── Desserts ──
@@ -93,7 +97,7 @@ export const MENU_ITEMS = [
     id: 14, name: 'Kheer',
     category: 'Desserts', price: 99, isVeg: true,
     description: 'Creamy slow-cooked rice pudding with cardamom, saffron, almonds and pistachios.',
-    image: 'https://i.pinimg.com/1200x/4f/ef/6e/4fef6eb53aedb0337475ccdd771005af.jpg',
+    image: 'https://i.pinimg.com/1200x/4d/46/b9/4d46b912d1f63044be152371d7ea0962.jpg',
   },
 
   // ── Drinks ──
@@ -107,7 +111,7 @@ export const MENU_ITEMS = [
     id: 16, name: 'Masala Chai',
     category: 'Drinks', price: 59, isVeg: true,
     description: 'Freshly brewed spiced tea with ginger, cardamom, and cinnamon. Served piping hot.',
-    image: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?auto=format&fit=crop&w=500&q=80',
+    image: 'https://i.pinimg.com/736x/22/33/bf/2233bf899709fc983fa0f2dc1cd3bc35.jpg',
   },
 ];
 
@@ -115,10 +119,36 @@ const CATEGORIES = ['All', 'Main Course', 'Biryani', 'Starters', 'Breads', 'Dess
 
 export default function Menu() {
   const [activeCategory, setActiveCategory] = useState('All');
-  const [filter, setFilter] = useState('all');
-  const [search, setSearch] = useState('');
+  const [filter, setFilter]                 = useState('all');
+  const [search, setSearch]                 = useState('');
+  const [menuItems, setMenuItems]           = useState(MENU_ITEMS);
+  const [loading, setLoading]               = useState(true);
 
-  const filtered = MENU_ITEMS.filter(item => {
+  // Fetch from backend on mount
+  useEffect(() => {
+    const fetchMenu = async () => {
+      try {
+        const res  = await fetch(`${API}/menu`);
+        const data = await res.json();
+        if (data.success && data.items?.length > 0) {
+          // Normalize MongoDB _id to id for compatibility
+          const normalized = data.items.map(item => ({
+            ...item,
+            id: item._id || item.id,
+          }));
+          setMenuItems(normalized);
+        }
+      } catch {
+        // Backend offline — keep hardcoded MENU_ITEMS as fallback
+        setMenuItems(MENU_ITEMS);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMenu();
+  }, []);
+
+  const filtered = menuItems.filter(item => {
     const matchCat    = activeCategory === 'All' || item.category === activeCategory;
     const matchFilter = filter === 'all' || (filter === 'veg' ? item.isVeg : !item.isVeg);
     const matchSearch = item.name.toLowerCase().includes(search.toLowerCase());
@@ -171,7 +201,18 @@ export default function Menu() {
 
         {filtered.length > 0 ? (
           <div className="menu-grid">
-            {filtered.map(item => <MenuCard key={item.id} item={item} />)}
+            {loading ? (
+              <div style={{ textAlign:'center', padding:'3rem', color:'var(--gray)' }}>
+                <div style={{ fontSize:'2rem', marginBottom:'0.5rem' }}>🍳</div>
+                <p>Loading menu...</p>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'3rem', color:'var(--gray)' }}>
+                <p>No items found.</p>
+              </div>
+            ) : (
+              filtered.map(item => <MenuCard key={item._id || item.id} item={item} />)
+            )}
           </div>
         ) : (
           <div className="no-results">

@@ -14,13 +14,40 @@ function generateOTP() {
 }
 
 export default function OrderTracking({ activeOrderId }) {
-  const { orders } = useOrders();
+  const { orders, socket, fetchMyOrders } = useOrders();
   const [otp, setOtp] = useState(generateOTP());
   const [otpTimer, setOtpTimer] = useState(30);
   const [otpRefreshing, setOtpRefreshing] = useState(false);
 
-  // Get the active order from shared context (live updates)
-  const order = orders.find(o => o.id === activeOrderId) || orders[0] || null;
+  // Persist activeOrderId in localStorage so page refresh works
+  useEffect(() => {
+    if (activeOrderId) {
+      localStorage.setItem('craveit_active_order', activeOrderId);
+    }
+  }, [activeOrderId]);
+
+  // Get orderId — from prop or from localStorage (survives refresh)
+  const savedOrderId = localStorage.getItem('craveit_active_order');
+  const orderId = activeOrderId || savedOrderId;
+
+  // Find order — match both _id (real backend) and id (localStorage)
+  const order = orders.find(o =>
+    o._id === orderId || o.id === orderId
+  ) || orders[0] || null;
+
+  // Join socket room for this order's real-time updates
+  useEffect(() => {
+    if (!socket || !order) return;
+    const roomId = order._id || order.id;
+    if (roomId) {
+      socket.emit('joinOrder', roomId);
+    }
+  }, [socket, order?._id, order?.id]);
+
+  // Fetch latest orders when page loads (so refresh works too)
+  useEffect(() => {
+    fetchMyOrders();
+  }, []);
 
   const currentStep = order
     ? STATUSES.findIndex(s => s.key === order.status)

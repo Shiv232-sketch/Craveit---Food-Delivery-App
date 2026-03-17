@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MENU_ITEMS } from './Menu';
 import { useOrders } from '../context/OrderContext';
 
@@ -65,8 +65,8 @@ function Dashboard({ orders, menuItems }) {
                 <thead><tr><th>Order ID</th><th>Customer</th><th>Total</th><th>Status</th><th>Time</th></tr></thead>
                 <tbody>
                   {orders.slice(0,6).map(o => (
-                    <tr key={o.id}>
-                      <td><span className="ap-order-id">{o.id}</span></td>
+                    <tr key={o._id||o.id}>
+                      <td><span className="ap-order-id">{o._id||o.id}</span></td>
                       <td>{o.customer}</td>
                       <td><strong>₹{o.pricing?.grandTotal}</strong></td>
                       <td><span className="ap-status-pill" style={{background:STATUS_COLORS[o.status]?.bg,color:STATUS_COLORS[o.status]?.color}}>{STATUS_COLORS[o.status]?.label}</span></td>
@@ -106,26 +106,77 @@ function Dashboard({ orders, menuItems }) {
 function MenuManagement({ menuItems, setMenuItems }) {
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState(null);
-  const [search, setSearch] = useState('');
-  const [form, setForm] = useState({ name:'', category:'Main Course', price:'', isVeg:true, description:'', image:'' });
+  const [search, setSearch]     = useState('');
+  const [form, setForm]         = useState({ name:'', category:'Main Course', price:'', isVeg:true, description:'', image:'' });
   const CATS = ['Main Course','Biryani','Starters','Breads','Desserts','Drinks'];
   const filtered = menuItems.filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
 
-  const openAdd = () => { setForm({ name:'', category:'Main Course', price:'', isVeg:true, description:'', image:'' }); setEditItem(null); setShowForm(true); };
-  const openEdit = (item) => { setForm({ name:item.name, category:item.category, price:item.price, isVeg:item.isVeg, description:item.description, image:item.image||'' }); setEditItem(item.id); setShowForm(true); };
+  const API = process.env.REACT_APP_API_URL
+    ? `${process.env.REACT_APP_API_URL}/api`
+    : 'http://localhost:5000/api';
+  const adminToken = localStorage.getItem('craveit_admin');
 
-  const handleSave = () => {
+  const openAdd  = () => { setForm({ name:'', category:'Main Course', price:'', isVeg:true, description:'', image:'' }); setEditItem(null); setShowForm(true); };
+  const openEdit = (item) => { setForm({ name:item.name, category:item.category, price:item.price, isVeg:item.isVeg, description:item.description, image:item.image||'' }); setEditItem(item._id||item.id); setShowForm(true); };
+
+  const handleSave = async () => {
     if (!form.name || !form.price) return;
-    if (editItem) {
-      setMenuItems(prev => prev.map(i => i.id===editItem ? {...i,...form,price:Number(form.price)} : i));
-    } else {
-      setMenuItems(prev => [...prev, {...form, id:Date.now(), price:Number(form.price)}]);
+    const body = { ...form, price: Number(form.price) };
+    try {
+      if (editItem) {
+        // Update existing
+        const res  = await fetch(`${API}/menu/${editItem}`, {
+          method: 'PUT',
+          headers: { 'Content-Type':'application/json', 'x-admin-token': adminToken },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setMenuItems(prev => prev.map(i => (i._id||i.id) === editItem ? { ...i, ...body, id: editItem } : i));
+        }
+      } else {
+        // Add new
+        const res  = await fetch(`${API}/menu`, {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'x-admin-token': adminToken },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setMenuItems(prev => [...prev, { ...data.item, id: data.item._id }]);
+        }
+      }
+    } catch {
+      // Fallback — update local state only
+      if (editItem) {
+        setMenuItems(prev => prev.map(i => (i._id||i.id) === editItem ? { ...i, ...body } : i));
+      } else {
+        setMenuItems(prev => [...prev, { ...body, id: Date.now(), _id: Date.now().toString() }]);
+      }
     }
     setShowForm(false);
   };
 
-  const handleDelete = (id) => { if (window.confirm('Delete this item?')) setMenuItems(prev => prev.filter(i => i.id!==id)); };
-  const toggleAvail = (id) => setMenuItems(prev => prev.map(i => i.id===id ? {...i, isAvailable:!(i.isAvailable!==false)} : i));
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this item?')) return;
+    try {
+      await fetch(`${API}/menu/${id}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-token': adminToken },
+      });
+    } catch {}
+    setMenuItems(prev => prev.filter(i => (i._id||i.id) !== id));
+  };
+
+  const toggleAvail = async (id) => {
+    try {
+      await fetch(`${API}/menu/${id}/toggle`, {
+        method: 'PATCH',
+        headers: { 'x-admin-token': adminToken },
+      });
+    } catch {}
+    setMenuItems(prev => prev.map(i => (i._id||i.id) === id ? { ...i, isAvailable: !(i.isAvailable !== false) } : i));
+  };
 
   return (
     <div className="ap-section">
@@ -195,7 +246,7 @@ function Orders() {
 
   const filtered = orders.filter(o => {
     const matchStatus = filter==='all' || o.status===filter;
-    const matchSearch = o.customer?.toLowerCase().includes(search.toLowerCase()) || o.id?.includes(search);
+    const matchSearch = o.customer?.toLowerCase().includes(search.toLowerCase()) || o._id||o.id?.includes(search);
     return matchStatus && matchSearch;
   });
 
@@ -230,9 +281,9 @@ function Orders() {
                 {filtered.length === 0
                   ? <tr><td colSpan={8} className="ap-empty">No orders match this filter.</td></tr>
                   : filtered.map(o => (
-                  <tr key={o.id}>
+                  <tr key={o._id||o.id}>
                     <td>
-                      <span className="ap-order-id">{o.id}</span>
+                      <span className="ap-order-id">{o._id||o.id}</span>
                       <br/><span className="ap-muted" style={{fontSize:'0.7rem'}}>{new Date(o.placedAt).toLocaleString('en-IN',{hour:'2-digit',minute:'2-digit',day:'numeric',month:'short'})}</span>
                     </td>
                     <td>
@@ -259,12 +310,12 @@ function Orders() {
                     <td>
                       <div style={{display:'flex',flexDirection:'column',gap:'0.3rem'}}>
                         {NEXT[o.status] && (
-                          <button className="ap-btn-sm" onClick={()=>updateOrderStatus(o.id, NEXT[o.status])}>
+                          <button className="ap-btn-sm" onClick={()=>updateOrderStatus(o._id||o.id, NEXT[o.status])}>
                             → {STATUS_COLORS[NEXT[o.status]]?.label}
                           </button>
                         )}
                         {o.status==='placed' && (
-                          <button className="ap-btn-sm cancel" onClick={()=>updateOrderStatus(o.id,'cancelled')}>✕ Cancel</button>
+                          <button className="ap-btn-sm cancel" onClick={()=>updateOrderStatus(o._id||o.id,'cancelled')}>✕ Cancel</button>
                         )}
                         {o.status==='delivered' && <span style={{fontSize:'0.75rem',color:'#22c55e',fontWeight:700}}>✓ Done</span>}
                         {o.status==='cancelled' && <span style={{fontSize:'0.75rem',color:'#dc2626',fontWeight:700}}>✗ Cancelled</span>}
@@ -286,7 +337,7 @@ function Users() {
   const { orders } = useOrders();
 
   const realCustomers = [...new Map(orders.map(o => [o.customer, {
-    id: o.id, name: o.customer, phone: o.phone||'—',
+    id: o._id||o.id, name: o.customer, phone: o.phone||'—',
     email: `${o.customer?.split(' ')[0]?.toLowerCase()}@gmail.com`,
     orders: orders.filter(x=>x.customer===o.customer).length,
     spent: orders.filter(x=>x.customer===o.customer).reduce((s,x)=>s+(x.pricing?.grandTotal||0),0),
@@ -446,9 +497,31 @@ function Users() {
 // ════════════════════════════════════════
 export default function AdminPanel({ onLogout }) {
   const { orders } = useOrders();
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [menuItems, setMenuItems] = useState(MENU_ITEMS);
+  const [activeTab, setActiveTab]   = useState('dashboard');
+  const [menuItems, setMenuItems]   = useState(MENU_ITEMS);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const API = process.env.REACT_APP_API_URL
+    ? `${process.env.REACT_APP_API_URL}/api`
+    : 'http://localhost:5000/api';
+
+  const adminToken = localStorage.getItem('craveit_admin');
+
+  // Fetch menu from backend on mount
+  useEffect(() => {
+    const fetchMenu = async () => {
+      try {
+        const res  = await fetch(`${API}/menu`);
+        const data = await res.json();
+        if (data.success && data.items?.length > 0) {
+          setMenuItems(data.items.map(i => ({ ...i, id: i._id || i.id })));
+        }
+      } catch {
+        setMenuItems(MENU_ITEMS);
+      }
+    };
+    fetchMenu();
+  }, []);
 
   const activeCount = orders.filter(o => !['delivered','cancelled'].includes(o.status)).length;
 
