@@ -422,16 +422,16 @@ function Users() {
   const API        = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'http://localhost:5000/api';
   const adminToken = localStorage.getItem('craveit_admin');
 
-  const [users,         setUsers]         = useState([]);
+  const [baseUsers,     setBaseUsers]     = useState([]);
   const [loading,       setLoading]       = useState(true);
   const [editUser,      setEditUser]      = useState(null);
   const [showEdit,      setShowEdit]      = useState(false);
   const [form,          setForm]          = useState({});
   const [search,        setSearch]        = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-  const [filter,        setFilter]        = useState('all'); // all | registered | guest
+  const [filter,        setFilter]        = useState('all');
 
-  // ── Fetch real users from backend ──────────────
+  // Fetch users ONCE on mount — no orders dependency = no flickering
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -441,35 +441,40 @@ function Users() {
         });
         const data = await res.json();
         if (data.success) {
-          // Mark all as registered users from MongoDB
-          const registered = data.users.map(u => ({
+          setBaseUsers(data.users.map(u => ({
             ...u,
-            id:         u._id || u.id,
-            phone:      u.phone || '—',
-            orders:     orders.filter(o => o.user === u._id || o.customer === u.name).length,
-            spent:      orders.filter(o => o.user === u._id || o.customer === u.name).reduce((s,x) => s+(x.pricing?.grandTotal||0), 0),
-            joined:     new Date(u.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }),
-            type:       'registered', // signed up via signup page
-          }));
-          setUsers(registered);
+            id:     u._id || u.id,
+            phone:  u.phone || '—',
+            joined: new Date(u.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' }),
+            type:   'registered',
+          })));
         }
       } catch {
-        // Fallback — build from orders if backend fails
-        const fromOrders = [...new Map(orders.map(o => [o.customer, {
-          id: o._id||o.id, name: o.customer, phone: o.phone||'—',
-          email: `${o.customer?.split(' ')[0]?.toLowerCase()}@gmail.com`,
-          orders: orders.filter(x => x.customer===o.customer).length,
-          spent:  orders.filter(x => x.customer===o.customer).reduce((s,x) => s+(x.pricing?.grandTotal||0), 0),
-          joined: new Date(o.placedAt).toLocaleDateString('en-IN', { month:'short', year:'numeric' }),
-          type:   'guest',
-        }])).values()];
-        setUsers(fromOrders);
+        // backend offline — fallback uses orders below
       } finally {
         setLoading(false);
       }
     };
     fetchUsers();
-  }, [orders]);
+  }, []); // empty = runs once only
+
+  // Compute order stats from orders (no loading state = no flicker)
+  const users = baseUsers.length > 0
+    ? baseUsers.map(u => ({
+        ...u,
+        orders: orders.filter(o => o.user === u._id || o.customer === u.name).length,
+        spent:  orders.filter(o => o.user === u._id || o.customer === u.name).reduce((s,x) => s+(x.pricing?.grandTotal||0), 0),
+      }))
+    : [...new Map(orders.map(o => [o.customer, {
+        id:     o._id||o.id,
+        name:   o.customer,
+        phone:  o.phone||'—',
+        email:  `${o.customer?.split(' ')[0]?.toLowerCase()}@gmail.com`,
+        orders: orders.filter(x => x.customer===o.customer).length,
+        spent:  orders.filter(x => x.customer===o.customer).reduce((s,x) => s+(x.pricing?.grandTotal||0), 0),
+        joined: new Date(o.placedAt).toLocaleDateString('en-IN', { month:'short', year:'numeric' }),
+        type:   'guest',
+      }])).values()];
 
   const filtered = users.filter(u => {
     const matchSearch = u.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -494,10 +499,10 @@ function Users() {
       });
       const data = await res.json();
       if (data.success) {
-        setUsers(prev => prev.map(u => (u._id||u.id) === (editUser._id||editUser.id) ? { ...u, ...form } : u));
+        setBaseUsers(prev => prev.map(u => (u._id||u.id) === (editUser._id||editUser.id) ? { ...u, ...form } : u));
       }
     } catch {
-      setUsers(prev => prev.map(u => u === editUser ? { ...u, ...form } : u));
+      setBaseUsers(prev => prev.map(u => u === editUser ? { ...u, ...form } : u));
     }
     setShowEdit(false);
   };
@@ -509,7 +514,7 @@ function Users() {
         headers: { 'x-admin-token': adminToken },
       });
     } catch {}
-    setUsers(prev => prev.filter(x => x !== u));
+    setBaseUsers(prev => prev.filter(x => x !== u));
     setDeleteConfirm(null);
   };
 
