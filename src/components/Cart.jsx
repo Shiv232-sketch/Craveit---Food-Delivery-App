@@ -29,25 +29,32 @@ export default function Cart({ onOrderSuccess }) {
 
   const handleProceedToPayment = () => { if (validateAddress()) setStep('payment'); };
 
-  const handlePaymentSuccess = (paymentMethod) => {
-    // Create the order in shared OrderContext
+  const handlePaymentSuccess = async (paymentMethod) => {
     const fullAddress = `${address.flat}, ${address.area}, ${address.city}, ${address.state} - ${address.pincode}`;
-    const newOrder = placeOrder({
+
+    // placeOrder is async — must await it
+    const newOrder = await placeOrder({
       customer: address.name,
-      phone: address.phone,
-      items: cartItems.map(i => ({ id: i.id, name: i.name, emoji: i.emoji, image: i.image, qty: i.qty, price: i.price })),
-      address: fullAddress,
+      phone:    address.phone,
+      items:    cartItems.map(i => ({ id: i.id, name: i.name, emoji: i.emoji, image: i.image, qty: i.qty, price: i.price })),
+      address:  fullAddress,
       addressType: address.type,
-      pricing: { subtotal: totalPrice, taxes, deliveryFee, grandTotal },
-      payment: { method: paymentMethod, status: 'paid' },
-      otp: Math.floor(100000 + Math.random() * 900000).toString(),
+      pricing:  { subtotal: totalPrice, taxes, deliveryFee, grandTotal },
+      payment:  { method: paymentMethod, status: 'paid' },
+      otp:      Math.floor(100000 + Math.random() * 900000).toString(),
     });
 
     clearCart();
     setStep('cart');
     setIsCartOpen(false);
     setAddress({ name:'', phone:'', flat:'', area:'', city:'', state:'', pincode:'', type:'Home' });
-    onOrderSuccess(newOrder.id);
+
+    // Support both _id (MongoDB) and id (localStorage fallback)
+    const orderId = newOrder?._id || newOrder?.id;
+    if (orderId) {
+      localStorage.setItem('craveit_active_order', orderId);
+      onOrderSuccess(orderId);
+    }
   };
 
   const handleClose = () => { setStep('cart'); setIsCartOpen(false); };

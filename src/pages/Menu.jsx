@@ -105,7 +105,7 @@ export const MENU_ITEMS = [
     id: 15, name: 'Mango Lassi',
     category: 'Drinks', price: 99, isVeg: true,
     description: 'Thick, chilled yoghurt blended with sweet Alphonso mango. Pure summer bliss.',
-    image: 'https://i.pinimg.com/1200x/97/25/ec/9725eca29432bd79fc5dbc34d1dffc75.jpg',
+    image: 'C:\Users\pcm\Downloads\Mango Lassi.jpg',
   },
   {
     id: 16, name: 'Masala Chai',
