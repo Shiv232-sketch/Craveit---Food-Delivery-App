@@ -5,8 +5,8 @@ const API = process.env.REACT_APP_API_URL
   : 'http://localhost:5000/api';
 
 export default function AdminLogin({ onLogin }) {
-  const [form, setForm]     = useState({ email: '', password: '' });
-  const [error, setError]   = useState('');
+  const [form,    setForm]    = useState({ email: '', password: '' });
+  const [error,   setError]   = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -15,7 +15,6 @@ export default function AdminLogin({ onLogin }) {
     setLoading(true);
 
     try {
-      // Try real backend first
       const res  = await fetch(`${API}/auth/admin/login`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -24,15 +23,18 @@ export default function AdminLogin({ onLogin }) {
       const data = await res.json();
 
       if (data.success) {
-        // Save real JWT token — needed for all admin API calls
+        // Clear any old token first
+        localStorage.removeItem('craveit_admin');
+        // Save fresh JWT token
         localStorage.setItem('craveit_admin', data.token);
         onLogin();
       } else {
         setError(data.message || 'Invalid credentials');
       }
     } catch {
-      // Backend offline — fallback to demo credentials
+      // Backend offline — use demo mode
       if (form.email === 'admin@craveit.in' && form.password === 'admin123') {
+        localStorage.removeItem('craveit_admin');
         localStorage.setItem('craveit_admin', 'demo_admin');
         onLogin();
       } else {
