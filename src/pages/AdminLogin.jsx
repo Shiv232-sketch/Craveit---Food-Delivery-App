@@ -14,27 +14,33 @@ export default function AdminLogin({ onLogin }) {
     setError('');
     setLoading(true);
 
+    // Always clear old token first
+    localStorage.removeItem('craveit_admin');
+
     try {
       const res  = await fetch(`${API}/auth/admin/login`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ email: form.email, password: form.password }),
+        body:    JSON.stringify({ 
+          email:    form.email.trim(), 
+          password: form.password 
+        }),
       });
-      const data = await res.json();
 
-      if (data.success) {
-        // Clear any old token first
-        localStorage.removeItem('craveit_admin');
-        // Save fresh JWT token
+      const data = await res.json();
+      console.log('Admin login response:', data); // debug
+
+      if (data.success && data.token) {
         localStorage.setItem('craveit_admin', data.token);
+        console.log('Token saved:', data.token.slice(0, 20) + '...'); // debug
         onLogin();
       } else {
         setError(data.message || 'Invalid credentials');
       }
-    } catch {
-      // Backend offline — use demo mode
-      if (form.email === 'admin@craveit.in' && form.password === 'admin123') {
-        localStorage.removeItem('craveit_admin');
+    } catch (err) {
+      console.log('Backend offline, using demo mode');
+      // Backend offline — demo mode
+      if (form.email.trim() === 'admin@craveit.in' && form.password === 'admin123') {
         localStorage.setItem('craveit_admin', 'demo_admin');
         onLogin();
       } else {
@@ -56,13 +62,23 @@ export default function AdminLogin({ onLogin }) {
         <form onSubmit={handleSubmit} className="admin-login-form">
           <div className="admin-field">
             <label>Email</label>
-            <input type="email" placeholder="admin@craveit.in"
-              value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} required />
+            <input 
+              type="email" 
+              placeholder="admin@craveit.in"
+              value={form.email} 
+              onChange={e => setForm({ ...form, email: e.target.value })} 
+              required 
+            />
           </div>
           <div className="admin-field">
             <label>Password</label>
-            <input type="password" placeholder="••••••••"
-              value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} required />
+            <input 
+              type="password" 
+              placeholder="••••••••"
+              value={form.password} 
+              onChange={e => setForm({ ...form, password: e.target.value })} 
+              required 
+            />
           </div>
           {error && <div className="admin-login-err">⚠️ {error}</div>}
           <button type="submit" className="admin-login-btn" disabled={loading}>

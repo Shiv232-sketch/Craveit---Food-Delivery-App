@@ -7,110 +7,164 @@ const STORAGE_KEY = 'craveit_orders';
 
 const getToken      = () => localStorage.getItem('craveit_token');
 const getAdminToken = () => localStorage.getItem('craveit_admin');
+const isAdminPage   = () => window.location.pathname.startsWith('/admin');
+
+// ── Strip heavy data before saving to localStorage ──
+// Base64 images are huge — remove them from order items before saving
+const stripForStorage = (orders) => {
+  return orders.map(order => ({
+    ...order,
+    items: (order.items || []).map(item => ({
+      id:    item.id || item._id,
+      name:  item.name,
+      price: item.price,
+      qty:   item.qty,
+      emoji: item.emoji,
+      // Don't save image — it's huge and causes quota error
+    }))
+  }));
+};
 
 const loadOrders = () => {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
 };
+
 const saveOrders = (orders) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+  try {
+    const stripped = stripForStorage(orders);
+    // Keep only last 20 orders to avoid quota issues
+    const trimmed  = stripped.slice(0, 20);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed));
+  } catch (err) {
+    // If still quota error — clear old orders and try again
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      const minimal = stripForStorage(orders.slice(0, 5));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
+    } catch {
+      console.log('localStorage full — orders only in memory');
+    }
+  }
+};
+
+const STATUS_PRIORITY = {
+  placed: 1, confirmed: 2, preparing: 3,
+  pickup: 4, delivered: 5, cancelled: 5
+};
+
+const mergeOrders = (localOrders, backendOrders) => {
+  const result = [...backendOrders];
+  backendOrders.forEach((backendOrder, idx) => {
+    const localMatch = localOrders.find(l => l._id === backendOrder._id || l.id === backendOrder._id);
+    if (localMatch) {
+      const localPriority   = STATUS_PRIORITY[localMatch.status]  || 0;
+      const backendPriority = STATUS_PRIORITY[backendOrder.status] || 0;
+      if (localPriority > backendPriority) {
+        result[idx] = { ...backendOrder, status: localMatch.status };
+      }
+    }
+  });
+  localOrders.forEach(local => {
+    const existsInBackend = backendOrders.find(b => b._id === local._id || b._id === local.id);
+    if (!existsInBackend && local.id?.startsWith('CRAVEIT-')) {
+      result.unshift(local);
+    }
+  });
+  return result;
 };
 
 export function OrderProvider({ children }) {
   const [orders,  setOrders]  = useState(loadOrders);
-  const [loading, setLoading] = useState(false);
-  const lastFetchRef          = useRef(0); // track last fetch time
+  const lastFetchRef           = useRef(0);
+  const isFetchingRef          = useRef(false);
 
-  // ── Smart sync — only fetch when needed ──────────
   const syncOrders = useCallback(async (force = false) => {
+    if (isFetchingRef.current) return;
     const now       = Date.now();
     const timeSince = now - lastFetchRef.current;
-
-    // Don't fetch if last fetch was less than 5 seconds ago (unless forced)
-    if (!force && timeSince < 5000) return;
+    if (!force && timeSince < 10000) return;
 
     const adminToken = getAdminToken();
     const userToken  = getToken();
 
+    isFetchingRef.current = true;
+
     try {
-      if (adminToken && adminToken !== 'demo_admin' && adminToken !== 'true') {
-        const res  = await fetch(`${API}/orders`, {
-          headers: { 'x-admin-token': adminToken }
-        });
-        if (!res.ok) throw new Error('fetch failed');
+      if (isAdminPage() && adminToken && !['true','demo_admin'].includes(adminToken)) {
+        const res  = await fetch(`${API}/orders`, { headers: { 'x-admin-token': adminToken } });
         const data = await res.json();
-        if (data.success && data.orders) {
+        if (data.success && Array.isArray(data.orders)) {
           lastFetchRef.current = now;
-          saveOrders(data.orders);
-          setOrders(data.orders);
-          return;
-        }
-      } else if (userToken && userToken !== 'demo_token') {
-        const res  = await fetch(`${API}/orders/my`, {
-          headers: { Authorization: `Bearer ${userToken}` }
-        });
-        if (!res.ok) throw new Error('fetch failed');
-        const data = await res.json();
-        if (data.success && data.orders) {
-          lastFetchRef.current = now;
-          const local  = loadOrders();
-          const merged = [
-            ...data.orders,
-            ...local.filter(l => !data.orders.find(b => b._id === l._id || b.id === l.id))
-          ];
+          const merged = mergeOrders(loadOrders(), data.orders);
           saveOrders(merged);
           setOrders(merged);
-          return;
+        } else if (data.message?.includes('invalid')) {
+          localStorage.removeItem('craveit_admin');
+        }
+      } else if (!isAdminPage() && userToken && userToken !== 'demo_token') {
+        const res  = await fetch(`${API}/orders/my`, { headers: { Authorization: `Bearer ${userToken}` } });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.orders)) {
+          lastFetchRef.current = now;
+          const merged = mergeOrders(loadOrders(), data.orders);
+          saveOrders(merged);
+          setOrders(merged);
         }
       }
     } catch {}
-
-    // Fallback — read localStorage only
-    const latest = loadOrders();
-    setOrders(prev => JSON.stringify(prev) !== JSON.stringify(latest) ? latest : prev);
+    finally { isFetchingRef.current = false; }
   }, []);
 
-  // ── Initial load ──────────────────────────────────
+  useEffect(() => { syncOrders(true); }, []);
   useEffect(() => {
-    syncOrders(true); // force fetch on mount
-  }, []);
-
-  // ── Poll every 8 seconds (not 2!) ─────────────────
-  useEffect(() => {
-    const interval = setInterval(() => syncOrders(), 8000);
+    const interval = setInterval(() => syncOrders(), 10000);
     return () => clearInterval(interval);
   }, [syncOrders]);
 
-  // ── Listen for localStorage changes (cross-tab) ───
   useEffect(() => {
     const handleStorage = (e) => {
-      if (e.key === STORAGE_KEY) {
-        const latest = loadOrders();
-        setOrders(latest);
+      if (e.key === STORAGE_KEY && e.newValue) {
+        try {
+          const newOrders = JSON.parse(e.newValue);
+          setOrders(prev => newOrders.map(newOrder => {
+            const existing = prev.find(p => p._id === newOrder._id || p.id === newOrder.id);
+            if (!existing) return newOrder;
+            const ep = STATUS_PRIORITY[existing.status] || 0;
+            const np = STATUS_PRIORITY[newOrder.status]  || 0;
+            return np >= ep ? newOrder : existing;
+          }));
+        } catch {}
       }
     };
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
-  // ── Place order ───────────────────────────────────
   const placeOrder = useCallback(async (orderData) => {
     const token = getToken();
 
+    // Strip images before creating local order
     const localOrder = {
       ...orderData,
       id:       'CRAVEIT-' + Date.now().toString().slice(-6),
       _id:      'CRAVEIT-' + Date.now().toString().slice(-6),
       status:   'placed',
       placedAt: new Date().toISOString(),
+      items:    (orderData.items || []).map(item => ({
+        id:    item.id,
+        name:  item.name,
+        price: item.price,
+        qty:   item.qty,
+        emoji: item.emoji,
+        // No image saved to localStorage
+      }))
     };
 
-    // Save to localStorage immediately
     const current = loadOrders();
     const updated = [localOrder, ...current];
     saveOrders(updated);
     setOrders(updated);
 
-    // Also save to backend if logged in
     if (token && token !== 'demo_token') {
       try {
         const res  = await fetch(`${API}/orders`, {
@@ -124,22 +178,15 @@ export function OrderProvider({ children }) {
           const refreshed    = loadOrders().map(o => o.id === localOrder.id ? backendOrder : o);
           saveOrders(refreshed);
           setOrders(refreshed);
-          // Force sync after placing
           lastFetchRef.current = 0;
-          setTimeout(() => syncOrders(true), 500);
           return backendOrder;
         }
-      } catch (err) {
-        console.log('Backend save failed, using local order');
-      }
+      } catch {}
     }
-
     return localOrder;
-  }, [syncOrders]);
+  }, []);
 
-  // ── Update order status (admin) ───────────────────
   const updateOrderStatus = useCallback(async (orderId, status) => {
-    // Update locally first — instant UI response
     const current = loadOrders();
     const updated = current.map(o =>
       (o._id === orderId || o.id === orderId) ? { ...o, status } : o
@@ -147,35 +194,25 @@ export function OrderProvider({ children }) {
     saveOrders(updated);
     setOrders(updated);
 
-    // Update backend
     const adminToken = getAdminToken();
-    if (adminToken && adminToken !== 'demo_admin' && adminToken !== 'true') {
+    if (adminToken && !['true','demo_admin'].includes(adminToken)) {
       try {
         await fetch(`${API}/orders/${orderId}/status`, {
           method:  'PATCH',
           headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
           body:    JSON.stringify({ status }),
         });
-        // Force sync after status update
         lastFetchRef.current = 0;
-        setTimeout(() => syncOrders(true), 500);
       } catch {}
     }
-  }, [syncOrders]);
+  }, []);
 
-  const getOrder = useCallback((orderId) => {
-    return orders.find(o => o._id === orderId || o.id === orderId) || null;
-  }, [orders]);
-
+  const getOrder       = useCallback((orderId) => orders.find(o => o._id === orderId || o.id === orderId) || null, [orders]);
   const fetchMyOrders  = useCallback(() => syncOrders(true), [syncOrders]);
   const fetchAllOrders = useCallback(() => syncOrders(true), [syncOrders]);
 
   return (
-    <OrderContext.Provider value={{
-      orders, loading,
-      placeOrder, updateOrderStatus, getOrder,
-      fetchMyOrders, fetchAllOrders
-    }}>
+    <OrderContext.Provider value={{ orders, placeOrder, updateOrderStatus, getOrder, fetchMyOrders, fetchAllOrders }}>
       {children}
     </OrderContext.Provider>
   );
