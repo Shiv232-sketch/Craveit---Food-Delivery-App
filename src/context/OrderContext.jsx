@@ -67,10 +67,27 @@ const mergeOrders = (localOrders, backendOrders) => {
   localOrders.forEach(local => {
     const existsInBackend = backendOrders.find(b => b._id === local._id || b._id === local.id);
     if (!existsInBackend && local.id?.startsWith('CRAVEIT-')) {
-      result.unshift(local);
+      result.push(local);
     }
   });
-  return result;
+  
+  const uniqueResult = [];
+  const seenIds = new Set();
+  result.forEach(r => {
+    const rId = r._id || r.id;
+    if (!seenIds.has(rId)) {
+      seenIds.add(rId);
+      uniqueResult.push(r);
+    }
+  });
+
+  uniqueResult.sort((a, b) => {
+    const dateA = (a.placedAt || a.createdAt) ? new Date(a.placedAt || a.createdAt).getTime() : 0;
+    const dateB = (b.placedAt || b.createdAt) ? new Date(b.placedAt || b.createdAt).getTime() : 0;
+    return dateB - dateA;
+  });
+
+  return uniqueResult;
 };
 
 export function OrderProvider({ children }) {
@@ -90,7 +107,7 @@ export function OrderProvider({ children }) {
     isFetchingRef.current = true;
 
     try {
-      if (isAdminPage() && adminToken && !['true','demo_admin'].includes(adminToken)) {
+      if (isAdminPage() && adminToken) {
         const res  = await fetch(`${API}/orders`, { headers: { 'x-admin-token': adminToken } });
         const data = await res.json();
         if (data.success && Array.isArray(data.orders)) {
@@ -101,7 +118,7 @@ export function OrderProvider({ children }) {
         } else if (data.message?.includes('invalid')) {
           localStorage.removeItem('craveit_admin');
         }
-      } else if (!isAdminPage() && userToken && userToken !== 'demo_token') {
+      } else if (!isAdminPage() && userToken) {
         const res  = await fetch(`${API}/orders/my`, { headers: { Authorization: `Bearer ${userToken}` } });
         const data = await res.json();
         if (data.success && Array.isArray(data.orders)) {
@@ -165,7 +182,7 @@ export function OrderProvider({ children }) {
     saveOrders(updated);
     setOrders(updated);
 
-    if (token && token !== 'demo_token') {
+    if (token) {
       try {
         const res  = await fetch(`${API}/orders`, {
           method:  'POST',
@@ -195,7 +212,7 @@ export function OrderProvider({ children }) {
     setOrders(updated);
 
     const adminToken = getAdminToken();
-    if (adminToken && !['true','demo_admin'].includes(adminToken)) {
+    if (adminToken) {
       try {
         await fetch(`${API}/orders/${orderId}/status`, {
           method:  'PATCH',

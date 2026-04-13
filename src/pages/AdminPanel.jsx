@@ -522,7 +522,9 @@ export default function AdminPanel({ onLogout }) {
   useEffect(() => {
     const fetchMenu = async () => {
       try {
-        const res  = await fetch(`${API}/menu`);
+        const res  = await fetch(`${API}/menu/admin/all`, {
+          headers: { 'x-admin-token': adminToken }
+        });
         const data = await res.json();
         if (data.success && data.items?.length > 0) setMenuItems(data.items.map(i => ({ ...i, id: i._id||i.id })));
       } catch { setMenuItems(MENU_ITEMS); }

@@ -29,10 +29,11 @@ export default function Cart({ onOrderSuccess }) {
 
   const handleProceedToPayment = () => { if (validateAddress()) setStep('payment'); };
 
+  const placedOrderIdRef = React.useRef(null);
+
   const handlePaymentSuccess = async (paymentMethod) => {
     const fullAddress = `${address.flat}, ${address.area}, ${address.city}, ${address.state} - ${address.pincode}`;
 
-    // placeOrder is async — must await it
     const newOrder = await placeOrder({
       customer: address.name,
       phone:    address.phone,
@@ -45,19 +46,30 @@ export default function Cart({ onOrderSuccess }) {
     });
 
     clearCart();
-    setStep('cart');
-    setIsCartOpen(false);
-    setAddress({ name:'', phone:'', flat:'', area:'', city:'', state:'', pincode:'', type:'Home' });
-
+    
     // Support both _id (MongoDB) and id (localStorage fallback)
     const orderId = newOrder?._id || newOrder?.id;
     if (orderId) {
       localStorage.setItem('craveit_active_order', orderId);
-      onOrderSuccess(orderId);
+      placedOrderIdRef.current = orderId;
     }
   };
 
-  const handleClose = () => { setStep('cart'); setIsCartOpen(false); };
+  const handleTrackOrder = () => {
+    setStep('cart');
+    setIsCartOpen(false);
+    setAddress({ name:'', phone:'', flat:'', area:'', city:'', state:'', pincode:'', type:'Home' });
+    if (placedOrderIdRef.current) {
+      onOrderSuccess(placedOrderIdRef.current);
+      placedOrderIdRef.current = null;
+    }
+  };
+
+  const handleClose = () => {
+    if (step === 'payment') return; // Prevent closing during payment processing
+    setStep('cart'); 
+    setIsCartOpen(false); 
+  };
   const fullAddress = `${address.flat}, ${address.area}, ${address.city}, ${address.state} - ${address.pincode}`;
 
   if (!isCartOpen) return null;
@@ -215,6 +227,7 @@ export default function Cart({ onOrderSuccess }) {
           <PaymentModal
             onClose={() => setStep('address')}
             onSuccess={handlePaymentSuccess}
+            onTrackOrder={handleTrackOrder}
             deliveryAddress={fullAddress}
             addressType={address.type}
             recipientName={address.name}

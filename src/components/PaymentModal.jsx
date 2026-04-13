@@ -3,7 +3,7 @@ import { useCart } from '../context/CartContext';
 
 const BANKS = ['State Bank of India','HDFC Bank','ICICI Bank','Axis Bank','Kotak Bank','Punjab National Bank'];
 
-export default function PaymentModal({ onClose, onSuccess, deliveryAddress, addressType, recipientName, recipientPhone }) {
+export default function PaymentModal({ onClose, onSuccess, onTrackOrder, deliveryAddress, addressType, recipientName, recipientPhone }) {
   const { totalPrice, cartItems } = useCart();
   const [method, setMethod] = useState('card');
   const [step, setStep] = useState('form');
@@ -39,7 +39,13 @@ export default function PaymentModal({ onClose, onSuccess, deliveryAddress, addr
   const handlePay = () => {
     if (!validate()) return;
     setStep('processing');
-    setTimeout(() => setStep(Math.random() > 0.15 ? 'success' : 'failed'), 2500);
+    setTimeout(() => {
+      const isSuccess = Math.random() > 0.15;
+      setStep(isSuccess ? 'success' : 'failed');
+      if (isSuccess) {
+        onSuccess(method);
+      }
+    }, 2500);
   };
 
   const addrIcon = addressType === 'Home' ? '🏠' : addressType === 'Work' ? '🏢' : '📌';
@@ -70,7 +76,7 @@ export default function PaymentModal({ onClose, onSuccess, deliveryAddress, addr
           <div className="success-row addr-row-success"><span>Delivering to</span><strong>{addrIcon} {deliveryAddress}</strong></div>
         </div>
         <p className="success-msg">Redirecting to live order tracking...</p>
-        <button className="btn-pay success-btn" onClick={() => onSuccess(method)}>
+        <button className="btn-pay success-btn" onClick={onTrackOrder}>
           🚀 Track My Order Live
         </button>
       </div>
