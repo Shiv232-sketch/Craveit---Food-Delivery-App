@@ -122,10 +122,26 @@ function MenuManagement({ menuItems, setMenuItems }) {
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { alert('Image too large! Max 2MB.'); return; }
+    if (file.size > 5 * 1024 * 1024) { alert('Image too large! Max 5MB.'); return; }
     setUploading(true);
     const reader = new FileReader();
-    reader.onloadend = () => { setForm(prev => ({ ...prev, image: reader.result })); setImagePreview(reader.result); setUploading(false); };
+    reader.onloadend = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 500;
+        const scaleSize = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressedBase64 = canvas.toDataURL('image/webp', 0.6);
+        setForm(prev => ({ ...prev, image: compressedBase64 }));
+        setImagePreview(compressedBase64);
+        setUploading(false);
+      };
+      img.src = reader.result;
+    };
     reader.readAsDataURL(file);
   };
 
