@@ -31,9 +31,10 @@ export default function OrderTracking({ activeOrderId }) {
   const orderId = activeOrderId || savedOrderId;
 
   // Find order — match both _id (real backend) and id (localStorage)
-  const order = orders.find(o =>
-    o._id === orderId || o.id === orderId
-  ) || orders[0] || null;
+  // Don't fallback to orders[0] — that would show a wrong/old order
+  const order = orderId
+    ? (orders.find(o => o._id === orderId || o.id === orderId) || null)
+    : null;
 
   // Join socket room for this order's real-time updates
   useEffect(() => {
