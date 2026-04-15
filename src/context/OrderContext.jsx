@@ -1,8 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const OrderContext = createContext();
 
+<<<<<<< HEAD
 const API = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'http://localhost:5000/api';
+=======
+const API        = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'http://localhost:5000/api';
+const STORAGE_KEY = 'craveit_orders';
+>>>>>>> parent of f6c5583 (orderproblem fix)
 
 const getToken      = () => localStorage.getItem('craveit_token');
 const getAdminToken = () => localStorage.getItem('craveit_admin');
@@ -28,6 +33,7 @@ const stripForStorage = (orders) => {
   }));
 };
 
+<<<<<<< HEAD
 const loadOrders = () => {
   try {
     return JSON.parse(localStorage.getItem(getStorageKey()) || '[]');
@@ -156,9 +162,78 @@ export function OrderProvider({ children }) {
   }, [syncOrders]);
 
   // ── Place a new order ──
+=======
+// ── localStorage helpers ──────────────────────────
+const loadOrders  = () => {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch { return []; }
+};
+const saveOrders  = (orders) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(orders));
+};
+
+export function OrderProvider({ children }) {
+  const [orders, setOrders] = useState(loadOrders);
+  const [loading, setLoading] = useState(false);
+
+  // ── Sync with backend & localStorage every 2 seconds ──
+  useEffect(() => {
+    const sync = async () => {
+      const adminToken = getAdminToken();
+      const userToken  = getToken();
+
+      // Try backend sync
+      try {
+        if (adminToken && adminToken !== 'demo_admin' && adminToken !== 'true') {
+          const res  = await fetch(`${API}/orders`, {
+            headers: { 'x-admin-token': adminToken }
+          });
+          const data = await res.json();
+          if (data.success && data.orders) {
+            // Merge backend orders into localStorage
+            const backendOrders = data.orders;
+            saveOrders(backendOrders);
+            setOrders(backendOrders);
+            return;
+          }
+        } else if (userToken && userToken !== 'demo_token') {
+          const res  = await fetch(`${API}/orders/my`, {
+            headers: { Authorization: `Bearer ${userToken}` }
+          });
+          const data = await res.json();
+          if (data.success && data.orders) {
+            // Merge — keep any local orders not yet on backend
+            const local   = loadOrders();
+            const backend = data.orders;
+            const merged  = [
+              ...backend,
+              ...local.filter(l => l.id && !backend.find(b => b._id === l._id || b.id === l.id))
+            ];
+            saveOrders(merged);
+            setOrders(merged);
+            return;
+          }
+        }
+      } catch {}
+
+      // Fallback — just read localStorage
+      const latest = loadOrders();
+      setOrders(prev => {
+        if (JSON.stringify(prev) !== JSON.stringify(latest)) return latest;
+        return prev;
+      });
+    };
+
+    sync(); // run immediately
+    const interval = setInterval(sync, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ── Place new order ───────────────────────────────
+>>>>>>> parent of f6c5583 (orderproblem fix)
   const placeOrder = useCallback(async (orderData) => {
     const token = getToken();
 
+    // Build local order immediately (shows instantly)
     const localOrder = {
       ...orderData,
       id:       'CRAVEIT-' + Date.now().toString().slice(-6),
@@ -174,12 +249,23 @@ export function OrderProvider({ children }) {
       }))
     };
 
+<<<<<<< HEAD
     // Optimistic: show order immediately
     const updated = [localOrder, ...ordersRef.current];
     saveOrders(updated);
     setOrders(updated);
 
     if (token) {
+=======
+    // Save to localStorage immediately so both tabs see it
+    const current = loadOrders();
+    const updated = [localOrder, ...current];
+    saveOrders(updated);
+    setOrders(updated);
+
+    // Also try to save to backend if logged in
+    if (token && token !== 'demo_token') {
+>>>>>>> parent of f6c5583 (orderproblem fix)
       try {
         const res  = await fetch(`${API}/orders`, {
           method:  'POST',
@@ -188,6 +274,7 @@ export function OrderProvider({ children }) {
         });
         const data = await res.json();
         if (data.success) {
+<<<<<<< HEAD
           const backendOrder = { ...data.order, id: data.order._id };
           // Replace temp order with real backend order
           const refreshed = ordersRef.current.map(o => o.id === localOrder.id ? backendOrder : o);
@@ -197,6 +284,19 @@ export function OrderProvider({ children }) {
         }
       } catch (err) {
         console.log('Place order API failed:', err.message);
+=======
+          // Replace local order with real backend order
+          const backendOrder = data.order;
+          const refreshed = loadOrders().map(o =>
+            o.id === localOrder.id ? { ...backendOrder, id: backendOrder._id } : o
+          );
+          saveOrders(refreshed);
+          setOrders(refreshed);
+          return { ...backendOrder, id: backendOrder._id };
+        }
+      } catch (err) {
+        console.log('Backend order failed, using local:', err.message);
+>>>>>>> parent of f6c5583 (orderproblem fix)
       }
     }
     return localOrder;
@@ -204,17 +304,27 @@ export function OrderProvider({ children }) {
 
   // ── Update order status (admin action) ──
   const updateOrderStatus = useCallback(async (orderId, status) => {
+<<<<<<< HEAD
     // 1. Record pending update — protects from stale backend overwrites for 15s
     pendingUpdatesRef.current.set(orderId, { status, time: Date.now() });
 
     // 2. Optimistic update — show immediately in UI
     const updated = ordersRef.current.map(o =>
+=======
+    // Update localStorage immediately
+    const current = loadOrders();
+    const updated = current.map(o =>
+>>>>>>> parent of f6c5583 (orderproblem fix)
       (o._id === orderId || o.id === orderId) ? { ...o, status } : o
     );
     saveOrders(updated);
     setOrders(updated);
 
+<<<<<<< HEAD
     // 3. Persist to backend
+=======
+    // Also update backend if admin token exists
+>>>>>>> parent of f6c5583 (orderproblem fix)
     const adminToken = getAdminToken();
     if (adminToken) {
       try {
@@ -223,6 +333,7 @@ export function OrderProvider({ children }) {
           headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
           body:    JSON.stringify({ status }),
         });
+<<<<<<< HEAD
         const data = await res.json();
         if (data.success && data.order) {
           // Backend confirmed — clear pending, use authoritative data
@@ -243,6 +354,19 @@ export function OrderProvider({ children }) {
   const getOrder       = useCallback((orderId) => orders.find(o => o._id === orderId || o.id === orderId) || null, [orders]);
   const fetchMyOrders  = useCallback(() => syncOrders(true), [syncOrders]);
   const fetchAllOrders = useCallback(() => syncOrders(true), [syncOrders]);
+=======
+      } catch {}
+    }
+  }, []);
+
+  // ── Get single order ──────────────────────────────
+  const getOrder = useCallback((orderId) => {
+    return orders.find(o => o._id === orderId || o.id === orderId) || null;
+  }, [orders]);
+
+  const fetchMyOrders  = useCallback(() => {}, []);
+  const fetchAllOrders = useCallback(() => {}, []);
+>>>>>>> parent of f6c5583 (orderproblem fix)
 
   return (
     <OrderContext.Provider value={{ orders, placeOrder, updateOrderStatus, getOrder, fetchMyOrders, fetchAllOrders }}>

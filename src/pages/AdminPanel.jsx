@@ -363,7 +363,7 @@ function Users() {
   }));
 
   // Guest users = placed orders but never signed up
-  const registeredNamesLower = registeredUsers.map(u => u.name?.toLowerCase());
+  const registeredNamesLower = registeredUsers.map(u => u.name?.trim().toLowerCase());
   const guestUsers = [...new Map(orders.map(o => [o.customer, {
     id:     o._id||o.id,
     name:   o.customer,
@@ -374,7 +374,7 @@ function Users() {
     joined: new Date(o.placedAt).toLocaleDateString('en-IN', { month:'short', year:'numeric' }),
     type:   'guest',
   }])).values()]
-  .filter(g => !registeredNamesLower.includes(g.name?.toLowerCase()));
+  .filter(g => g && g.name && !registeredNamesLower.includes(g.name.trim().toLowerCase()));
 
   // Combine: registered first, then guests
   const allUsers = [...registeredWithStats, ...guestUsers];
