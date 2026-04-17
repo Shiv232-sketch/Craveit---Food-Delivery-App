@@ -7,7 +7,7 @@ const API = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/ap
 =======
 const API        = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'http://localhost:5000/api';
 const STORAGE_KEY = 'craveit_orders';
->>>>>>> parent of f6c5583 (orderproblem fix)
+>>>>>>> parent of f6c5583 (orderproblem fix)    
 
 const getToken      = () => localStorage.getItem('craveit_token');
 const getAdminToken = () => localStorage.getItem('craveit_admin');
