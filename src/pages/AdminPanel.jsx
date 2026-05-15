@@ -2,14 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { MENU_ITEMS } from './Menu';
 import { useOrders } from '../context/OrderContext';
 
-const FAKE_USERS = [
-  { id:1, name:'Rohit Sharma',  email:'rohit@gmail.com',  phone:'9876543210', orders:8,  spent:4820, joined:'Jan 2026' },
-  { id:2, name:'Priya Singh',   email:'priya@gmail.com',  phone:'9765432109', orders:5,  spent:2340, joined:'Feb 2026' },
-  { id:3, name:'Arjun Mehta',   email:'arjun@yahoo.com',  phone:'9654321098', orders:12, spent:8760, joined:'Dec 2025' },
-  { id:4, name:'Sneha Gupta',   email:'sneha@gmail.com',  phone:'9543210987', orders:3,  spent:1290, joined:'Mar 2026' },
-  { id:5, name:'Vikram Yadav',  email:'vikram@yahoo.com', phone:'9432109876', orders:7,  spent:3870, joined:'Jan 2026' },
-];
-
 const STATUS_COLORS = {
   placed:    { bg:'#eff6ff', color:'#3b82f6', label:'Placed' },
   confirmed: { bg:'#fef3c7', color:'#d97706', label:'Confirmed' },
@@ -21,7 +13,7 @@ const STATUS_COLORS = {
 const NEXT = { placed:'confirmed', confirmed:'preparing', preparing:'pickup', pickup:'delivered' };
 
 // ── Dashboard ──
-function Dashboard({ orders, menuItems }) {
+function Dashboard({ orders, menuItems, userCount }) {
   const delivered = orders.filter(o => o.status === 'delivered');
   const totalRevenue = delivered.reduce((s,o) => s + (o.pricing?.grandTotal || 0), 0);
   const activeOrders = orders.filter(o => !['delivered','cancelled'].includes(o.status)).length;
@@ -31,7 +23,7 @@ function Dashboard({ orders, menuItems }) {
     { label:'Total Orders',     value:orders.length,   icon:'📦', color:'#3b82f6', sub:'All time' },
     { label:'Active Orders',    value:activeOrders,    icon:'🔥', color:'#E8401C', sub:'In progress' },
     { label:'Menu Items',       value:menuItems.length,icon:'🍽️', color:'#f59e0b', sub:`${menuItems.filter(i=>i.isVeg).length} veg · ${menuItems.filter(i=>!i.isVeg).length} non-veg` },
-    { label:'Registered Users', value:FAKE_USERS.length,icon:'👥',color:'#8b5cf6', sub:'Customers' },
+    { label:'Registered Users', value:userCount,icon:'👥',color:'#8b5cf6', sub:'Customers' },
     { label:'Avg Order Value',  value:orders.length ? `₹${Math.round(orders.reduce((s,o)=>s+(o.pricing?.grandTotal||0),0)/orders.length)}` : '₹0', icon:'📊', color:'#06b6d4', sub:'Per order' },
   ];
 
@@ -80,20 +72,38 @@ function Dashboard({ orders, menuItems }) {
         <div className="ap-card">
           <div className="ap-card-head"><h3>Top Selling Dishes</h3></div>
           <div className="ap-top-dishes">
-            {menuItems.slice(0,5).map((item,i) => (
-              <div key={item.id} className="ap-top-dish">
-                <span className="ap-top-rank">#{i+1}</span>
-                <img src={item.image} alt={item.name} className="ap-dish-thumb" onError={e=>e.target.style.display='none'} />
-                <div className="ap-dish-info">
-                  <p className="ap-dish-name">{item.name}</p>
-                  <p className="ap-dish-cat">{item.category}</p>
+            {(() => {
+              // Compute real order counts per menu item from actual orders
+              const itemCounts = {};
+              orders.forEach(o => {
+                (o.items || []).forEach(item => {
+                  const key = item.name;
+                  if (!itemCounts[key]) itemCounts[key] = { count: 0, revenue: 0 };
+                  itemCounts[key].count += (item.qty || 1);
+                  itemCounts[key].revenue += (item.price || 0) * (item.qty || 1);
+                });
+              });
+              // Rank menu items by real order count
+              const ranked = menuItems.map(item => ({
+                ...item,
+                orderCount: itemCounts[item.name]?.count || 0,
+                orderRevenue: itemCounts[item.name]?.revenue || 0,
+              })).sort((a,b) => b.orderCount - a.orderCount).slice(0,5);
+              return ranked.map((item,i) => (
+                <div key={item.id||item._id} className="ap-top-dish">
+                  <span className="ap-top-rank">#{i+1}</span>
+                  <img src={item.image} alt={item.name} className="ap-dish-thumb" onError={e=>e.target.style.display='none'} />
+                  <div className="ap-dish-info">
+                    <p className="ap-dish-name">{item.name}</p>
+                    <p className="ap-dish-cat">{item.category}</p>
+                  </div>
+                  <div className="ap-dish-stats">
+                    <p className="ap-dish-orders">{item.orderCount} orders</p>
+                    <p className="ap-dish-rev">₹{item.orderRevenue.toLocaleString()}</p>
+                  </div>
                 </div>
-                <div className="ap-dish-stats">
-                  <p className="ap-dish-orders">{40-i*5} orders</p>
-                  <p className="ap-dish-rev">₹{(item.price*(40-i*5)).toLocaleString()}</p>
-                </div>
-              </div>
-            ))}
+              ));
+            })()}
           </div>
         </div>
       </div>
@@ -531,6 +541,7 @@ export default function AdminPanel({ onLogout }) {
   const [activeTab,   setActiveTab]   = useState('dashboard');
   const [menuItems,   setMenuItems]   = useState(MENU_ITEMS);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [userCount,   setUserCount]   = useState(0);
 
   const API        = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'http://localhost:5000/api';
   const adminToken = localStorage.getItem('craveit_admin');
@@ -545,7 +556,15 @@ export default function AdminPanel({ onLogout }) {
         if (data.success && data.items?.length > 0) setMenuItems(data.items.map(i => ({ ...i, id: i._id||i.id })));
       } catch { setMenuItems(MENU_ITEMS); }
     };
+    const fetchUserCount = async () => {
+      try {
+        const res  = await fetch(`${API}/users`, { headers: { 'x-admin-token': adminToken } });
+        const data = await res.json();
+        if (data.success && Array.isArray(data.users)) setUserCount(data.users.length);
+      } catch { /* keep 0 */ }
+    };
     fetchMenu();
+    fetchUserCount();
   }, []);
 
   const activeCount = orders.filter(o => !['delivered','cancelled'].includes(o.status)).length;
@@ -590,7 +609,7 @@ export default function AdminPanel({ onLogout }) {
           </div>
         </div>
         <div className="ap-content">
-          {activeTab==='dashboard' && <Dashboard orders={orders} menuItems={menuItems} />}
+          {activeTab==='dashboard' && <Dashboard orders={orders} menuItems={menuItems} userCount={userCount} />}
           {activeTab==='menu'      && <MenuManagement menuItems={menuItems} setMenuItems={setMenuItems} />}
           {activeTab==='orders'    && <Orders />}
           {activeTab==='users'     && <Users />}

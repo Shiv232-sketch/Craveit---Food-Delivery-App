@@ -7,6 +7,7 @@ import { OrderProvider } from './context/OrderContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Cart from './components/Cart';
+import ErrorBoundary from './components/ErrorBoundary';
 
 import Home from './pages/Home';
 import Menu from './pages/Menu';
@@ -26,6 +27,15 @@ function AdminArea() {
     localStorage.removeItem('craveit_admin');
     setIsAdmin(false);
   };
+
+  // Auto-logout when token expires (OrderContext fires this event on 401)
+  React.useEffect(() => {
+    const onExpired = () => {
+      setIsAdmin(false);
+    };
+    window.addEventListener('craveit_admin_expired', onExpired);
+    return () => window.removeEventListener('craveit_admin_expired', onExpired);
+  }, []);
 
   return (
     <OrderProvider>
@@ -69,9 +79,11 @@ function MainSite() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/admin" element={<AdminArea />} />
-      <Route path="/*"     element={<MainSite />} />
-    </Routes>
+    <ErrorBoundary>
+      <Routes>
+        <Route path="/admin" element={<AdminArea />} />
+        <Route path="/*"     element={<MainSite />} />
+      </Routes>
+    </ErrorBoundary>
   );
 }

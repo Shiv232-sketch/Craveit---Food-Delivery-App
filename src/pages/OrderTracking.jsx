@@ -14,7 +14,7 @@ function generateOTP() {
 }
 
 export default function OrderTracking({ activeOrderId }) {
-  const { orders, socket, fetchMyOrders } = useOrders();
+  const { orders, fetchMyOrders } = useOrders();
   const [otp, setOtp] = useState(generateOTP());
   const [otpTimer, setOtpTimer] = useState(30);
   const [otpRefreshing, setOtpRefreshing] = useState(false);
@@ -36,14 +36,7 @@ export default function OrderTracking({ activeOrderId }) {
     ? (orders.find(o => o._id === orderId || o.id === orderId) || null)
     : null;
 
-  // Join socket room for this order's real-time updates
-  useEffect(() => {
-    if (!socket || !order) return;
-    const roomId = order._id || order.id;
-    if (roomId) {
-      socket.emit('joinOrder', roomId);
-    }
-  }, [socket, order?._id, order?.id]);
+
 
   // Fetch latest orders when page loads (so refresh works too)
   useEffect(() => {
@@ -111,7 +104,7 @@ export default function OrderTracking({ activeOrderId }) {
             <div className="order-id-banner">
               <div>
                 <p className="order-id-label">Order ID</p>
-                <p className="order-id-value">{order.id}</p>
+                <p className="order-id-value">{(order.id || order._id)?.slice(-8)?.toUpperCase()}</p>
               </div>
               <div>
                 <span className={`order-badge ${isDelivered ? 'delivered' : isCancelled ? 'cancelled' : 'active'}`}>

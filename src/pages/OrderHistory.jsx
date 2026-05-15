@@ -106,20 +106,20 @@ export default function OrderHistory() {
           <div className="oh-list">
             {filtered.map(order => {
               const meta = STATUS_META[order.status] || STATUS_META.placed;
-              const isOpen = expanded === order.id;
+              const isOpen = expanded === (order._id || order.id);
 
               return (
-                <div key={order.id} className={`oh-card ${isOpen ? 'expanded' : ''}`}>
+                <div key={order._id || order.id} className={`oh-card ${isOpen ? 'expanded' : ''}`}>
 
                   {/* Card Header */}
-                  <div className="oh-card-top" onClick={() => toggleExpand(order.id)}>
+                  <div className="oh-card-top" onClick={() => toggleExpand(order._id || order.id)}>
                     <div className="oh-card-left">
                       <div className="oh-status-icon" style={{ background: meta.bg, color: meta.color }}>
                         {meta.icon}
                       </div>
                       <div className="oh-card-info">
                         <div className="oh-card-id-row">
-                          <span className="oh-order-id">{order.id}</span>
+                          <span className="oh-order-id">{(order.id || order._id)?.slice(-8)?.toUpperCase()}</span>
                           <span className="oh-status-pill" style={{ background: meta.bg, color: meta.color }}>
                             {meta.label}
                           </span>

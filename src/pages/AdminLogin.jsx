@@ -42,14 +42,8 @@ export default function AdminLogin({ onLogin }) {
         setError(data.message || 'Invalid credentials');
       }
     } catch {
-      // Backend offline — use demo mode
-      if (form.email === 'admin@craveit.in' && form.password === 'admin123') {
-        localStorage.removeItem('craveit_admin');
-        localStorage.setItem('craveit_admin', 'demo_admin');
-        onLogin();
-      } else {
-        setError('Invalid credentials. Use admin@craveit.in / admin123');
-      }
+      // Backend offline
+      setError('Could not connect to server. Please ensure the backend is running.');
     }
 
     setLoading(false);

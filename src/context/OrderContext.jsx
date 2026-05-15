@@ -18,12 +18,14 @@ const getStorageKey = () => isAdminPage() ? STORAGE_KEY_ADMIN : STORAGE_KEY_USER
 const stripForStorage = (orders) => {
   return orders.map(order => ({
     ...order,
+    // Preserve all order-level fields needed by OrderTracking & OrderHistory
     items: (order.items || []).map(item => ({
       id:    item.id || item._id,
       name:  item.name,
       price: item.price,
       qty:   item.qty,
       emoji: item.emoji,
+      image: item.image || '',
     }))
   }));
 };
@@ -78,11 +80,17 @@ export function OrderProvider({ children }) {
 
       if (isAdminPage() && adminToken) {
         const res  = await fetch(`${API}/orders`, { headers: { 'x-admin-token': adminToken } });
+        if (res.status === 401 || res.status === 403) {
+          // Token expired or invalid — clear it and notify the UI to redirect to login
+          localStorage.removeItem('craveit_admin');
+          localStorage.removeItem(STORAGE_KEY_ADMIN);
+          window.dispatchEvent(new Event('craveit_admin_expired'));
+          isFetchingRef.current = false;
+          return;
+        }
         const data = await res.json();
         if (data.success && Array.isArray(data.orders)) {
           backendOrders = data.orders;
-        } else if (data.message?.includes('invalid')) {
-          localStorage.removeItem('craveit_admin');
         }
       } else if (!isAdminPage() && userToken) {
         const res  = await fetch(`${API}/orders/my`, { headers: { Authorization: `Bearer ${userToken}` } });
@@ -97,17 +105,19 @@ export function OrderProvider({ children }) {
 
         // Clean expired pending updates
         for (const [id, entry] of pendingUpdatesRef.current.entries()) {
-          if (now - entry.time > 15000) pendingUpdatesRef.current.delete(id);
+          if (now - entry.time > 30000) pendingUpdatesRef.current.delete(id);
         }
 
         // Build final order list: backend is source of truth,
-        // but respect pending optimistic updates for 15s
+        // but respect pending optimistic updates for 30s
         const merged = backendOrders.map(order => {
+          // Normalize _id → id so frontend components can use order.id consistently
+          const normalized = { ...order, id: order._id || order.id };
           const pending = pendingUpdatesRef.current.get(order._id);
-          if (pending && Date.now() - pending.time < 15000) {
-            return { ...order, status: pending.status };
+          if (pending && Date.now() - pending.time < 30000) {
+            return { ...normalized, status: pending.status };
           }
-          return order;
+          return normalized;
         });
 
         // Add any local-only orders (temp IDs not yet synced to backend)
@@ -144,6 +154,10 @@ export function OrderProvider({ children }) {
     for (let i = 0; i < prev.length; i++) {
       if ((prev[i]._id || prev[i].id) !== (next[i]._id || next[i].id)) return true;
       if (prev[i].status !== next[i].status) return true;
+      // Detect when backend has richer data than stripped localStorage
+      if (!prev[i].customer && next[i].customer) return true;
+      if (!prev[i].address && next[i].address) return true;
+      if (!prev[i].pricing && next[i].pricing) return true;
     }
     return false;
   }
@@ -172,6 +186,7 @@ const placeOrder = useCallback(async (orderData) => {
       price: item.price,
       qty:   item.qty,
       emoji: item.emoji,
+      image: item.image || '',
     }))
   };
 
@@ -205,7 +220,7 @@ const placeOrder = useCallback(async (orderData) => {
 
 // ── Update order status (admin action) ──
 const updateOrderStatus = useCallback(async (orderId, status) => {
-  // 1. Record pending update — protects from stale backend overwrites for 15s
+  // 1. Record pending update — protects from stale backend overwrites for 30s
   pendingUpdatesRef.current.set(orderId, { status, time: Date.now() });
 
   // 2. Optimistic update — show immediately in UI
@@ -215,28 +230,49 @@ const updateOrderStatus = useCallback(async (orderId, status) => {
   saveOrders(updated);
   setOrders(updated);
 
-  // 3. Persist to backend
+  // 3. Persist to backend (with retry)
   const adminToken = getAdminToken();
   if (adminToken) {
-    try {
-      const res = await fetch(`${API}/orders/${orderId}/status`, {
-        method:  'PATCH',
-        headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
-        body:    JSON.stringify({ status }),
-      });
-      const data = await res.json();
-      if (data.success && data.order) {
-        // Backend confirmed — clear pending, use authoritative data
-        pendingUpdatesRef.current.delete(orderId);
-        const confirmed = ordersRef.current.map(o =>
-          (o._id === orderId || o.id === orderId) ? { ...data.order, id: data.order._id } : o
-        );
-        saveOrders(confirmed);
-        setOrders(confirmed);
+    let success = false;
+    for (let attempt = 0; attempt < 2 && !success; attempt++) {
+      try {
+        const res = await fetch(`${API}/orders/${orderId}/status`, {
+          method:  'PATCH',
+          headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+          body:    JSON.stringify({ status }),
+        });
+        if (res.status === 401 || res.status === 403) {
+          // Token expired — redirect to login immediately
+          localStorage.removeItem('craveit_admin');
+          window.dispatchEvent(new Event('craveit_admin_expired'));
+          pendingUpdatesRef.current.delete(orderId);
+          break;
+        }
+        const data = await res.json();
+        if (data.success && data.order) {
+          // Backend confirmed — clear pending, use authoritative data
+          pendingUpdatesRef.current.delete(orderId);
+          const confirmed = ordersRef.current.map(o =>
+            (o._id === orderId || o.id === orderId) ? { ...data.order, id: data.order._id } : o
+          );
+          saveOrders(confirmed);
+          setOrders(confirmed);
+          success = true;
+        } else {
+          console.warn(`[CraveIt] Status update rejected by server (attempt ${attempt + 1}):`, data.message);
+        }
+      } catch (err) {
+        console.warn(`[CraveIt] Status update network error (attempt ${attempt + 1}):`, err.message);
+        if (attempt === 0) {
+          // Wait 1s before retry
+          await new Promise(r => setTimeout(r, 1000));
+        }
       }
-    } catch (err) {
-      console.log('Update order status failed:', err.message);
-      // Pending update stays protected for 15s
+    }
+    if (!success) {
+      // Keep pending protection active — extend time so it doesn't revert
+      pendingUpdatesRef.current.set(orderId, { status, time: Date.now() });
+      console.error('[CraveIt] Failed to update order status after 2 attempts. Status will be protected for 30s.');
     }
   }
 }, []);
