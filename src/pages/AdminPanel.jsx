@@ -552,9 +552,19 @@ export default function AdminPanel({ onLogout }) {
         const res  = await fetch(`${API}/menu/admin/all`, {
           headers: { 'x-admin-token': adminToken }
         });
+        if (res.status === 401 || res.status === 403) {
+          // Token expired — don't wipe the menu, just keep current items
+          console.warn('[CraveIt] Admin token expired for menu fetch');
+          return;
+        }
         const data = await res.json();
-        if (data.success && data.items?.length > 0) setMenuItems(data.items.map(i => ({ ...i, id: i._id||i.id })));
-      } catch { setMenuItems(MENU_ITEMS); }
+        if (data.success && Array.isArray(data.items)) {
+          setMenuItems(data.items.map(i => ({ ...i, id: i._id||i.id })));
+        }
+      } catch {
+        // Backend offline — only use hardcoded items if we have nothing to show
+        setMenuItems(prev => prev.length > 0 ? prev : MENU_ITEMS);
+      }
     };
     const fetchUserCount = async () => {
       try {

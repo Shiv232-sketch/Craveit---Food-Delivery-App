@@ -105,7 +105,7 @@ export const MENU_ITEMS = [
     id: 15, name: 'Mango Lassi',
     category: 'Drinks', price: 99, isVeg: true,
     description: 'Thick, chilled yoghurt blended with sweet Alphonso mango. Pure summer bliss.',
-    image: 'https://images.unsplash.com/photo-1571091718767-18b5b1457add?auto=format&fit=crop&w=500&q=80',
+    image: 'https://i.pinimg.com/736x/e8/a3/2a/e8a32a665883d2d1afff0639ca387a33.jpg',
   },
   {
     id: 16, name: 'Masala Chai',
@@ -130,17 +130,20 @@ export default function Menu() {
       try {
         const res  = await fetch(`${API}/menu`);
         const data = await res.json();
-        if (data.success && data.items?.length > 0) {
-          // Normalize MongoDB _id to id for compatibility
-          const normalized = data.items.map(item => ({
-            ...item,
-            id: item._id || item.id,
-          }));
-          setMenuItems(normalized);
+        if (data.success && Array.isArray(data.items)) {
+          if (data.items.length > 0) {
+            // Normalize MongoDB _id to id for compatibility
+            const normalized = data.items.map(item => ({
+              ...item,
+              id: item._id || item.id,
+            }));
+            setMenuItems(normalized);
+          }
+          // If DB returns 0 items, keep showing hardcoded items as fallback
         }
       } catch {
         // Backend offline — keep hardcoded MENU_ITEMS as fallback
-        setMenuItems(MENU_ITEMS);
+        setMenuItems(prev => prev.length > 0 ? prev : MENU_ITEMS);
       } finally {
         setLoading(false);
       }
