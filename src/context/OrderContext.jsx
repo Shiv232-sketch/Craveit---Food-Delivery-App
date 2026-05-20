@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { io } from 'socket.io-client';
 
 const OrderContext = createContext();
 
 const API = process.env.REACT_APP_API_URL ? `${process.env.REACT_APP_API_URL}/api` : 'http://localhost:5000/api';
+const SOCKET_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000').replace(/\/api\/?$/, '');
 
 const getToken      = () => localStorage.getItem('craveit_token');
 const getAdminToken = () => localStorage.getItem('craveit_admin');
@@ -54,12 +56,14 @@ const saveOrders = (orders) => {
 
 export function OrderProvider({ children }) {
   const [orders, setOrders]    = useState(loadOrders);
+  const [socketConnected, setSocketConnected] = useState(false);
   const lastFetchRef           = useRef(0);
   const isFetchingRef          = useRef(false);
   const ordersRef              = useRef(orders);
   // Track optimistic status updates — protects them from being overwritten
   // by stale backend data that arrives before the DB has committed
   const pendingUpdatesRef      = useRef(new Map());
+  const socketRef              = useRef(null);
 
   // Keep ref in sync with state
   useEffect(() => { ordersRef.current = orders; }, [orders]);
@@ -162,6 +166,83 @@ export function OrderProvider({ children }) {
     return false;
   }
 
+  // ── Socket.io: real-time updates ──
+  useEffect(() => {
+    const socket = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      reconnectionAttempts: 10,
+      reconnectionDelay: 2000,
+    });
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log('[CraveIt] Socket connected:', socket.id);
+      setSocketConnected(true);
+      // Admin joins admin_room for new-order notifications
+      if (isAdminPage()) {
+        socket.emit('joinAdmin');
+      }
+      // Customer joins rooms for each of their orders
+      ordersRef.current.forEach(o => {
+        const oid = o._id || o.id;
+        if (oid && !oid.startsWith('CRAVEIT-')) {
+          socket.emit('joinOrder', oid);
+        }
+      });
+    });
+
+    // ── Customer: instant status update from admin action ──
+    socket.on('orderStatusUpdate', ({ orderId, status }) => {
+      console.log('[CraveIt] Real-time status update:', orderId, '→', status);
+      const updated = ordersRef.current.map(o =>
+        (o._id === orderId || o.id === orderId) ? { ...o, status } : o
+      );
+      saveOrders(updated);
+      setOrders(updated);
+    });
+
+    // ── Admin: new order notification → refresh list ──
+    socket.on('newOrder', () => {
+      console.log('[CraveIt] New order received via socket');
+      syncOrders(true);
+    });
+
+    // ── Admin: order status changed by another admin tab ──
+    socket.on('orderUpdated', ({ orderId, status }) => {
+      console.log('[CraveIt] Order updated via socket:', orderId, '→', status);
+      const updated = ordersRef.current.map(o =>
+        (o._id === orderId || o.id === orderId) ? { ...o, status } : o
+      );
+      saveOrders(updated);
+      setOrders(updated);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('[CraveIt] Socket disconnected');
+      setSocketConnected(false);
+    });
+
+    socket.on('connect_error', () => {
+      setSocketConnected(false);
+    });
+
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Join order rooms when new orders are added ──
+  useEffect(() => {
+    if (!socketRef.current?.connected) return;
+    orders.forEach(o => {
+      const oid = o._id || o.id;
+      if (oid && !oid.startsWith('CRAVEIT-')) {
+        socketRef.current.emit('joinOrder', oid);
+      }
+    });
+  }, [orders]);
+
   // ── Polling: sync on mount + every 10 seconds ──
   useEffect(() => { syncOrders(true); }, []);
   useEffect(() => {
@@ -209,6 +290,12 @@ const placeOrder = useCallback(async (orderData) => {
         const refreshed = ordersRef.current.map(o => o.id === localOrder.id ? backendOrder : o);
         saveOrders(refreshed);
         setOrders(refreshed);
+
+        // Join the socket room for this new order so we get real-time updates
+        if (socketRef.current?.connected) {
+          socketRef.current.emit('joinOrder', data.order._id);
+        }
+
         return backendOrder;
       }
     } catch (err) {
@@ -282,7 +369,7 @@ const fetchMyOrders  = useCallback(() => syncOrders(true), [syncOrders]);
 const fetchAllOrders = useCallback(() => syncOrders(true), [syncOrders]);
 
   return (
-    <OrderContext.Provider value={{ orders, placeOrder, updateOrderStatus, getOrder, fetchMyOrders, fetchAllOrders }}>
+    <OrderContext.Provider value={{ orders, placeOrder, updateOrderStatus, getOrder, fetchMyOrders, fetchAllOrders, socketConnected }}>
       {children}
     </OrderContext.Provider>
   );
