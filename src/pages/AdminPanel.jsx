@@ -365,16 +365,33 @@ function Users() {
     fetchUsers();
   }, []);
 
-  // Add order stats to registered users
-  const registeredWithStats = registeredUsers.map(u => ({
-    ...u,
-    orders: orders.filter(o => o.user === (u._id||u.id) || o.customer?.toLowerCase() === u.name?.toLowerCase()).length,
-    spent:  orders.filter(o => o.user === (u._id||u.id) || o.customer?.toLowerCase() === u.name?.toLowerCase()).reduce((s,x) => s+(x.pricing?.grandTotal||0), 0),
-  }));
+  // Add order stats to registered users — match by user ID (reliable) OR name (fallback)
+  const registeredIdSet = new Set(registeredUsers.map(u => (u._id || u.id)?.toString()));
+  const registeredWithStats = registeredUsers.map(u => {
+    const uid = (u._id || u.id)?.toString();
+    const myOrders = orders.filter(o =>
+      o.user?.toString() === uid ||
+      (o.user && typeof o.user === 'object' && o.user._id?.toString() === uid) ||
+      o.customer?.toLowerCase().trim() === u.name?.toLowerCase().trim()
+    );
+    return {
+      ...u,
+      orders: myOrders.length,
+      spent:  myOrders.reduce((s, x) => s + (x.pricing?.grandTotal || 0), 0),
+    };
+  });
 
-  // Guest users = placed orders but never signed up
-  const registeredNamesLower = registeredUsers.map(u => u.name?.trim().toLowerCase());
-  const guestUsers = [...new Map(orders.map(o => [o.customer, {
+  // Guest users = placed orders but user ID doesn't match any registered user
+  const guestUsers = [...new Map(orders
+    .filter(o => {
+      // If order.user matches a registered user ID, it's NOT a guest
+      const orderUserId = (o.user && typeof o.user === 'object') ? o.user._id?.toString() : o.user?.toString();
+      if (orderUserId && registeredIdSet.has(orderUserId)) return false;
+      // Also check by name as fallback
+      if (o.customer && registeredUsers.some(u => u.name?.toLowerCase().trim() === o.customer.toLowerCase().trim())) return false;
+      return true;
+    })
+    .map(o => [o.customer, {
     id:     o._id||o.id,
     name:   o.customer,
     phone:  o.phone||'—',
@@ -384,7 +401,7 @@ function Users() {
     joined: new Date(o.placedAt).toLocaleDateString('en-IN', { month:'short', year:'numeric' }),
     type:   'guest',
   }])).values()]
-  .filter(g => g && g.name && !registeredNamesLower.includes(g.name.trim().toLowerCase()));
+  .filter(g => g && g.name);
 
   // Combine: registered first, then guests
   const allUsers = [...registeredWithStats, ...guestUsers];
